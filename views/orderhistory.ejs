@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/historyorder.css">
+<link rel="stylesheet" href="/mobile-responsive.css">
+<title>Admin Dashboard</title>
+<script src="/script/session-manager.js"></script>
+<script src="/script/back-button-prevention.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+      <div class="brandname">
+        <div class="logo">
+          <img src="/logo.png" alt="Logo" class="logo-img">
+        </div>
+        <h2>Gray Countryside Cafe</h2>
+      </div>
+      <div class="logout-container">
+        <button onclick="handleLogout()">Logout</button>
+      </div>
+    </nav>
+
+    <div class="sidebar">
+      <div class="search-section">
+        <input type="text" class="search" id="menuSearch" placeholder="Search..">
+      </div>
+
+      <ul class="dashboard-menu">
+        <li><a href="/admindashboard/dashboard" onclick="showSection('dashboard')" class="active"></i> Dashboard</a></li>
+        <li><a href="/admindashboard/Inventory">Inventory</a></li>
+        <li><a href="/admindashboard/salesandreports">Sales Reports</a></li>
+        <li><a href="/admindashboard/orderhistory">Order History</a></li>
+        <li><a href="/admindashboard/addstaff">Add Staff</a></li>
+        <li><a href="/admindashboard/menumanagement">Menu Management</a></li>
+        <li><a href="/admindashboard/infosettings">Settings</a></li>
+      </ul>
+      <footer class="sidebar-footer">
+        &copy; 2026 For School Purposes Only. All rights reserved.
+      </footer>
+    </div>
+
+  
+<div class="main-content">
+  
+  <div id="dashboardSection" class="section-content"></div>
+  
+  <div id="historySection" class="section-content active-section">
+    <div class="section-header">
+      <h1><i class="fas fa-history"></i> Order History</h1>
+    </div>
+
+    <div class="orders-container">
+      
+      <div class="no-orders" id="noOrdersMessage">
+        <i class="fas fa-clipboard-list fa-3x"></i>
+      </div>
+
+      <table class="orders-table" id="ordersTable" style="display: none;">
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Customer</th>
+            <th>Items</th>
+            <th>Total Amount</th>
+            <th>Status</th>
+            <th>Date & Time</th>
+            <th>Payment Method</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="ordersTableBody">
+         
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination" id="pagination" style="display: none;">
+      <button class="pagination-btn" onclick="changePage(-1)">
+        <i class="fas fa-chevron-left"></i> Previous
+      </button>
+      <span class="page-info">Page <span id="currentPage">1</span> of <span id="totalPages">1</span></span>
+      <button class="pagination-btn" onclick="changePage(1)">
+        Next <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+
+          <div class="chart-card">
+            <div class="table-header">
+              <h3>Top Selling Items</h3>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="topItemsBody">
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="dashboard-lower">
+          <div class="table-container">
+            <div class="table-header">
+              <div>
+                <h3>Inventory Status</h3>
+                <p style="font-size: 12px; color: #999; margin-top: 4px;">Low Stock & Out of Stock Items</p>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Stock</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryStatusBody">
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-container">
+            <div class="table-header">
+              <h3>Today's Orders</h3>
+            </div>
+            <table id="todaysOrdersTable">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Time</th>
+                  <th>Customer ID</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="todaysOrdersBody">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+<script src="/script/orderhistory.js"></script>
+<script src="/script/dashboard.js"></script>
+<script>
+  function handleLogout() {
+    if (confirm('Are you sure you want to logout?')) {
+      window.location.href = '/login';
+    }
+  }
+</script>
+  

@@ -1,0 +1,670 @@
+/* ==================== 📱 MOBILE-ONLY RESPONSIVE CSS ====================
+   This file contains ONLY mobile responsive styles
+   Desktop and laptop layouts remain UNCHANGED
+   ================================================== */
+
+/* ==================== 📱 MOBILE SCREENS (Max-width: 768px) ==================== */
+
+@media (max-width: 768px) {
+    /* ==================== GENERAL LAYOUT ==================== */
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+    }
+
+    /* ==================== NAVBAR ==================== */
+    .navbar {
+        flex-direction: column !important;
+        padding: 10px !important;
+        gap: 10px !important;
+    }
+
+    .brandname {
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center !important;
+        gap: 5px !important;
+    }
+
+    .brandname h2 {
+        font-size: 18px !important;
+        margin: 0 !important;
+    }
+
+    .logo {
+        width: 40px !important;
+        height: 40px !important;
+    }
+
+    .logo-img {
+        width: 40px !important;
+        height: 40px !important;
+    }
+
+    .logout-container,
+    .logout-btn {
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+    }
+
+    .logout-container button,
+    .logout-btn button {
+        width: 80% !important;
+        min-height: 40px !important;
+        font-size: 14px !important;
+    }
+
+    /* ==================== DASHBOARD CONTAINER ==================== */
+    .dashboard-container {
+        flex-direction: column !important;
+        padding: 10px !important;
+        gap: 10px !important;
+    }
+
+    /* ==================== SIDEBAR ==================== */
+    .sidebar {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 10px !important;
+        margin-bottom: 10px !important;
+        order: -1 !important;
+    }
+
+    .sidebar .search-section {
+        margin-bottom: 10px !important;
+    }
+
+    .sidebar input.search {
+        width: 100% !important;
+        padding: 10px !important;
+        font-size: 14px !important;
+    }
+
+    .sidebar ul.dashboard-menu {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 5px !important;
+    }
+
+    .sidebar ul.dashboard-menu li {
+        width: 100% !important;
+    }
+
+    .sidebar ul.dashboard-menu li a {
+        width: 100% !important;
+        padding: 10px !important;
+        font-size: 13px !important;
+        text-align: left !important;
+    }
+
+    .sidebar-footer {
+        font-size: 11px !important;
+        padding: 5px !important;
+        text-align: center !important;
+    }
+
+    /* ==================== MAIN CONTENT ==================== */
+    .main-content,
+    .center,
+    .product,
+    .staffdashboard,
+    .dashboard {
+        width: 100% !important;
+        padding: 10px !important;
+        margin: 0 !important;
+    }
+
+    /* ==================== STATS CONTAINER ==================== */
+    .stats-container {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+        padding: 10px !important;
+    }
+
+    .stat-card {
+        padding: 15px !important;
+        min-height: 100px !important;
+    }
+
+    .stat-card h3 {
+        font-size: 13px !important;
+    }
+
+    .stat-card p,
+    .stat-card h2 {
+        font-size: 16px !important;
+    }
+
+    /* ==================== CHARTS CONTAINER ==================== */
+    .charts-container {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+        padding: 10px !important;
+    }
+
+    .chart-card {
+        padding: 15px !important;
+    }
+
+    .chart-header {
+        flex-direction: column !important;
+        gap: 5px !important;
+    }
+
+    .chart-header h2 {
+        font-size: 16px !important;
+    }
+
+    .chart-placeholder {
+        height: 200px !important;
+    }
+
+    /* ==================== FORMS ==================== */
+    .form-group,
+    .input-container {
+        width: 100% !important;
+        margin-bottom: 10px !important;
+    }
+
+    .form-group label,
+    .input-container label {
+        font-size: 13px !important;
+        display: block !important;
+        margin-bottom: 5px !important;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea,
+    .input-container input,
+    .input-container select,
+    .input-container textarea {
+        width: 100% !important;
+        padding: 10px !important;
+        font-size: 14px !important;
+        border-radius: 5px !important;
+    }
+
+    /* ==================== BUTTONS ==================== */
+    button,
+    .btn,
+    .button-container button {
+        width: 100% !important;
+        padding: 12px !important;
+        font-size: 14px !important;
+        margin: 5px 0 !important;
+        border-radius: 5px !important;
+    }
+
+    .button-container {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 5px !important;
+    }
+
+    .button-container button {
+        margin: 0 !important;
+    }
+
+    /* ==================== TABLES ==================== */
+    table {
+        font-size: 12px !important;
+        width: 100% !important;
+        overflow-x: auto !important;
+    }
+
+    table thead {
+        display: none !important;
+    }
+
+    table tbody tr {
+        display: block !important;
+        margin-bottom: 10px !important;
+        border: 1px solid #ddd !important;
+        border-radius: 5px !important;
+        padding: 10px !important;
+    }
+
+    table tbody td {
+        display: block !important;
+        text-align: right !important;
+        padding: 8px 0 !important;
+        border: none !important;
+    }
+
+    table tbody td:before {
+        content: attr(data-label) !important;
+        float: left !important;
+        font-weight: bold !important;
+        text-align: left !important;
+    }
+
+    /* ==================== MENU GRID ==================== */
+    .menu-grid {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+        padding: 10px !important;
+    }
+
+    .product-card,
+    .card {
+        padding: 10px !important;
+        border-radius: 5px !important;
+    }
+
+    .card-img {
+        width: 100% !important;
+        height: 150px !important;
+        object-fit: cover !important;
+        border-radius: 5px !important;
+    }
+
+    .card-body {
+        padding: 10px !important;
+    }
+
+    .card-body h3,
+    .card-body p {
+        font-size: 14px !important;
+        margin: 5px 0 !important;
+    }
+
+    .card-info {
+        grid-template-columns: 1fr !important;
+        gap: 5px !important;
+    }
+
+    /* ==================== ORDER/CART ==================== */
+    .product,
+    .cart {
+        width: 100% !important;
+        padding: 10px !important;
+        margin: 0 !important;
+    }
+
+    #productlist,
+    .order-list {
+        list-style: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    #productlist li,
+    .order-list li {
+        padding: 10px !important;
+        margin: 5px 0 !important;
+        background: #f9f9f9 !important;
+        border-radius: 5px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        font-size: 13px !important;
+    }
+
+    .order-item-info {
+        flex: 1 !important;
+    }
+
+    .order-item-name {
+        display: block !important;
+        font-weight: bold !important;
+        font-size: 13px !important;
+    }
+
+    .order-item-stock {
+        display: block !important;
+        font-size: 12px !important;
+        margin-top: 3px !important;
+    }
+
+    .order-item-controls {
+        display: flex !important;
+        gap: 5px !important;
+        align-items: center !important;
+    }
+
+    .order-item-quantity,
+    .order-item-price {
+        font-size: 12px !important;
+    }
+
+    .remove-item-btn {
+        padding: 5px 8px !important;
+        font-size: 12px !important;
+        width: auto !important;
+        min-width: 30px !important;
+    }
+
+    /* ==================== TOTALS SECTION ==================== */
+    .totals,
+    .totals-section {
+        padding: 10px !important;
+        margin: 10px 0 !important;
+        background: #f0f0f0 !important;
+        border-radius: 5px !important;
+    }
+
+    .totals p,
+    .totals h3,
+    .totals-section p,
+    .totals-section h3 {
+        font-size: 13px !important;
+        margin: 5px 0 !important;
+        display: flex !important;
+        justify-content: space-between !important;
+    }
+
+    /* ==================== PAYMENT SECTION ==================== */
+    .payment-section {
+        padding: 10px !important;
+        gap: 10px !important;
+    }
+
+    .order-type-row {
+        display: flex !important;
+        gap: 5px !important;
+    }
+
+    .order-type-row button,
+    .dineinandtakeout-btn {
+        flex: 1 !important;
+        padding: 10px !important;
+        font-size: 12px !important;
+        width: 100% !important;
+    }
+
+    .customer-info {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+
+    /* ==================== MODALS & POPUPS ==================== */
+    .modal,
+    .popup,
+    [id*="modal"],
+    [id*="popup"] {
+        width: 90vw !important;
+        max-width: 95vw !important;
+        margin: auto !important;
+        border-radius: 10px !important;
+        padding: 15px !important;
+    }
+
+    .modal-content,
+    .popup-content {
+        padding: 15px !important;
+    }
+
+    .modal-header,
+    .popup-header {
+        font-size: 16px !important;
+        margin-bottom: 10px !important;
+    }
+
+    .modal-body,
+    .popup-body {
+        font-size: 13px !important;
+    }
+
+    .modal-footer,
+    .popup-footer {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 5px !important;
+        margin-top: 10px !important;
+    }
+
+    .modal-footer button,
+    .popup-footer button {
+        width: 100% !important;
+        padding: 10px !important;
+    }
+
+    /* ==================== SEARCH INPUT ==================== */
+    input[type="text"][placeholder*="Search"],
+    .search {
+        width: 100% !important;
+        padding: 10px !important;
+        font-size: 14px !important;
+        margin-bottom: 10px !important;
+    }
+
+    /* ==================== INVENTORY ITEMS ==================== */
+    .inventory-item,
+    .stock-item {
+        padding: 10px !important;
+        margin: 5px 0 !important;
+        border-radius: 5px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+    }
+
+    /* ==================== TYPOGRAPHY ==================== */
+    h1 {
+        font-size: 20px !important;
+        margin: 10px 0 !important;
+    }
+
+    h2 {
+        font-size: 18px !important;
+        margin: 8px 0 !important;
+    }
+
+    h3 {
+        font-size: 16px !important;
+        margin: 6px 0 !important;
+    }
+
+    p {
+        font-size: 13px !important;
+        line-height: 1.4 !important;
+    }
+
+    /* ==================== SPACING ==================== */
+    section,
+    .section {
+        padding: 10px !important;
+        margin: 5px 0 !important;
+    }
+
+    /* ==================== VISIBILITY & DISPLAY ==================== */
+    .hide-on-mobile {
+        display: none !important;
+    }
+
+    .show-on-mobile {
+        display: block !important;
+    }
+
+    /* ==================== FLEX LAYOUT FIXES ==================== */
+    .flex-container,
+    [style*="display: flex"] {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+
+    .flex-row {
+        flex-direction: column !important;
+    }
+
+    /* ==================== GRID LAYOUT FIXES ==================== */
+    [style*="display: grid"] {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+
+    /* ==================== TEXT OVERFLOW ==================== */
+    .truncate,
+    .text-truncate {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    /* ==================== TOUCH-FRIENDLY TARGETS ==================== */
+    button,
+    a,
+    .clickable {
+        min-height: 44px !important;
+        min-width: 44px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* ==================== SCROLLABLE AREAS ==================== */
+    .scrollable,
+    .table-responsive {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+}
+
+/* ==================== EXTRA SMALL DEVICES (Max-width: 480px) ==================== */
+
+@media (max-width: 480px) {
+    /* Make everything even more compact */
+    
+    .navbar {
+        padding: 8px !important;
+    }
+
+    .brandname h2 {
+        font-size: 16px !important;
+    }
+
+    .logo {
+        width: 35px !important;
+        height: 35px !important;
+    }
+
+    .sidebar ul.dashboard-menu li a {
+        padding: 8px !important;
+        font-size: 12px !important;
+    }
+
+    .stat-card {
+        padding: 10px !important;
+        min-height: 80px !important;
+    }
+
+    button,
+    .btn {
+        padding: 10px !important;
+        font-size: 13px !important;
+    }
+
+    table {
+        font-size: 11px !important;
+    }
+
+    .menu-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .product-card,
+    .card {
+        padding: 8px !important;
+    }
+
+    .card-img {
+        height: 120px !important;
+    }
+
+    #productlist li {
+        padding: 8px !important;
+        font-size: 12px !important;
+    }
+
+    .order-item-name {
+        font-size: 12px !important;
+    }
+
+    .order-item-stock {
+        font-size: 11px !important;
+    }
+
+    .totals p,
+    .totals h3 {
+        font-size: 12px !important;
+    }
+
+    .modal,
+    .popup {
+        width: 95vw !important;
+        padding: 10px !important;
+    }
+
+    h1 {
+        font-size: 18px !important;
+    }
+
+    h2 {
+        font-size: 16px !important;
+    }
+
+    h3 {
+        font-size: 14px !important;
+    }
+
+    p {
+        font-size: 12px !important;
+    }
+}
+
+/* ==================== LANDSCAPE MODE (Mobile) ==================== */
+
+@media (max-width: 768px) and (orientation: landscape) {
+    .sidebar {
+        order: -1 !important;
+    }
+
+    .dashboard-container {
+        flex-direction: row !important;
+    }
+
+    .main-content,
+    .center {
+        flex: 1 !important;
+    }
+
+    .stats-container {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    .menu-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+/* ==================== PRINT STYLES ==================== */
+
+@media print {
+    .navbar,
+    .sidebar,
+    .logout-btn,
+    button,
+    .no-print {
+        display: none !important;
+    }
+
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .main-content,
+    .center {
+        width: 100% !important;
+        padding: 0 !important;
+    }
+}

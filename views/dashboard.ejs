@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/dashboard.css">
+<link rel="stylesheet" href="/mobile-responsive.css">
+<title>Admin Dashboard</title>
+<script src="/script/session-manager.js"></script>
+<script src="/script/back-button-prevention.js"></script>
+</head>
+<body>
+<!-- NAVBAR -->
+<nav class="navbar">
+<div class="brandname">
+<div class="logo">
+<img src="/logo.png" alt="Logo" class="logo-img">
+</div>
+<h2>Gray Countryside Cafe</h2>
+</div>
+<div class="logout-container">
+<button onclick="handleLogout()">Logout</button>
+</div>
+</nav>
+
+<!-- Dashboard Container -->
+<div class="dashboard-container">
+<!-- Left Column: Dashboard Sidebar -->
+<div class="sidebar">
+<div class="search-section">
+<input type="text" class="search" id="menuSearch" placeholder="Search..">
+</div>
+
+<ul class="dashboard-menu">
+<li><a href="/admindashboard/dashboard" onclick="showSection('dashboard')" class="active">Dashboard</a></li>
+<li><a href="/admindashboard/Inventory">Inventory</a></li>
+<li><a href="/admindashboard/salesandreports">Sales Reports</a></li>
+<li><a href="/admindashboard/orderhistory">Order History</a></li>
+<li><a href="/admindashboard/addstaff">Add Staff</a></li>
+<li><a href="/admindashboard/menumanagement">Menu Management</a></li>
+<li><a href="/admindashboard/infosettings">Settings</a></li>
+</ul>
+<footer class="sidebar-footer">
+&copy; 2026 For School Purposes Only. All rights reserved.
+</footer>
+</div>
+
+ <!-- Main Content Area -->
+    <div class="main-content">
+      
+      <!-- STATS SECTION -->
+      <section class="stats-container">
+        <div class="stat-card">
+          <h3>Total Orders</h3>
+          <p id="totalOrders"><%= stats.totalOrders || 0 %></p>
+        </div>
+
+        <div class="stat-card revenue-card">
+          <div class="stat-info">
+            <h3>Total Revenue</h3>
+            <p class="revenue-amount">
+              <span id="totalRevenue" class="revenue-value"><%= stats.totalRevenue ? '₱' + stats.totalRevenue.toFixed(2) : '₱0.00' %></span>
+            </p>
+            <div class="revenue-change">
+              <i class="fas fa-arrow-up"></i>
+            </div>
+          </div>
+          <div class="stat-icon">
+            <i class="fas fa-chart-line"></i>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <h3>Total Customers</h3>
+          <p id="totalCustomers"><%= stats.totalCustomers || 0 %></p>
+        </div>
+
+        <div class="stat-card">
+        <h3>Total Inventory</h3>
+        <p id="totalInventory"><%= stats.totalInventoryItems || stats.totalInventory || 0 %></p>
+        </div>
+
+        <div class="stat-card">
+          <h3>Total Menu</h3>
+         <h2 id="totalMenuItems"><%= stats.totalMenuItems || 0 %></h2>
+        </div>
+      </section>
+
+      <!-- SALES OVERVIEW -->
+      <div class="charts-container">
+        <div class="chart-card">
+          <div class="chart-header">
+            <h2>SALES OVERVIEW</h2>
+            <div class="chart-info-right">
+              <span id="chartSummary">Today's Sales</span>
+            </div>
+          </div>
+          
+          <div class="chart-placeholder">
+            <div class="mock-chart">
+              <div class="chart-bars" id="chartBars">
+                
+              </div>
+              <div class="chart-labels" id="chartLabels">
+              </div>
+            </div>
+          </div>
+          
+          <div class="chart-footer">
+            
+            
+          </div>
+        </div>
+      </div>
+
+      <!-- DATA GRID (Inventory Status & Today's Orders) -->
+      <div class="data-grid">
+        <!-- Inventory Status -->
+        <div class="data-card">
+          <div class="data-header">
+            <div>
+              <h3>Inventory Status</h3>
+              <p style="font-size: 12px; color: #999; margin-top: 4px;">Low Stock & Out of Stock Items</p>
+            </div>
+            <span class="status-badge">Updated 3:00 PM</span>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Stock</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryTableBody">
+              <!-- Data will be loaded here -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Today's Orders -->
+        <div class="data-card">
+          <div class="data-header">
+            <h3>Today's Orders</h3>
+            <a href="#" class="view-all">View All</a>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Time</th>
+                <th>Customer ID</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody">
+              <!-- Data will be loaded here -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Top Selling Items -->
+        <div class="data-card">
+          <div class="data-header">
+            <h3>Top Selling Items</h3>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Total Sales</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="topItemsTableBody">
+              <!-- Data will be loaded here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+<!-- REAL-TIME TEST SCRIPT FOR G'RAY COUNTRYSIDE CAFÉ -->
+<script>
+// Business Information
+const BUSINESS_INFO = {
+    name: "G'RAY COUNTRYSIDE CAFÉ",
+    address: "IPO Road, Barangay Minuyan Proper",
+    city: "City of San Jose Del Monte, Bulacan"
+};
+
+// Debug logging function
+function debugLog(message, type = 'info') {
+  const log = document.getElementById('debugLog');
+  if (!log) return;
+  
+  const timestamp = new Date().toLocaleTimeString('en-PH');
+  const color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#4CAF50' : '#2196F3';
+  const entry = document.createElement('div');
+  entry.innerHTML = `<span style="color: #aaa">[${timestamp}]</span> <span style="color: ${color}">${message}</span>`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+  console.log(`[DEBUG] ${message}`);
+}
+
+// Simple real-time test for G'RAY COUNTRYSIDE CAFÉ POS System
+async function testRealTime() {
+  debugLog('========================================');
+  debugLog('🔄 Starting G\'RAY COUNTRYSIDE CAFÉ Real-time Test');
+  debugLog('========================================');
+  
+  try {
+    // Check if we're logged in as admin
+    const token = document.cookie.includes('token=');
+    debugLog(`🔐 Authentication: ${token ? 'Logged in' : 'Not logged in'}`);
+    
+    if (!token) {
+      debugLog('⚠️ Please log in as admin to receive real-time updates', 'error');
+      return;
+    }
+    
+    // Try to connect to SSE endpoint
+    debugLog('📡 Connecting to real-time events endpoint...');
+    
+    const eventSource = new EventSource('/api/admin/events');
+    
+    eventSource.onopen = () => {
+      debugLog('✅ Connected to G\'RAY COUNTRYSIDE CAFÉ real-time server', 'success');
+      debugLog('📊 Listening for: New Orders, Low Stock Alerts, Stats Updates');
+    };
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        debugLog(`📥 Received event: ${data.type}`);
+        
+        switch(data.type) {
+          case 'new_order':
+            handleNewOrder(data.data);
+            break;
+          case 'low_stock_alert':
+            handleLowStockAlert(data.data);
+            break;
+          case 'stats_update':
+            handleStatsUpdate(data.data);
+            break;
+          case 'connected':
+            debugLog('🔗 Real-time connection established', 'success');
+            break;
+          default:
+            debugLog(`📤 Unknown event type: ${data.type}`);
+        }
+      } catch (e) {
+        debugLog(`❌ Error parsing event: ${e.message}`, 'error');
+      }
+    };
+    
+    eventSource.onerror = (error) => {
+      debugLog(`❌ Real-time connection error`, 'error');
+      eventSource.close();
+      
+      // Try to reconnect after 5 seconds
+      setTimeout(() => {
+        debugLog('🔄 Reconnecting to real-time server...');
+        testRealTime();
+      }, 5000);
+    };
+    
+    // Store for cleanup
+    window._eventSource = eventSource;
+    
+  } catch (error) {
+    debugLog(`❌ Real-time setup failed: ${error.message}`, 'error');
+  }
+}
+
+// Handle new order event
+function handleNewOrder(order) {
+  debugLog(`🆕 New Order Received: #${order.orderNumber}`, 'success');
+  debugLog(`   💰 Total: ₱${order.total.toFixed(2)}`);
+  debugLog(`   👥 Customer: ${order.customerId || 'Walk-in'}`);
+  debugLog(`   📦 Items: ${order.items || 0} items`);
+  
+  // Update the UI
+  updateDashboardWithNewOrder(order);
+  
+  // Show notification
+  showOrderNotification(order);
+}
+
+// Handle low stock alert
+function handleLowStockAlert(stockData) {
+  debugLog(`📦 Low Stock Alert: ${stockData.itemName}`, 'warning');
+  debugLog(`   📊 Current: ${stockData.currentStock} units`);
+  debugLog(`   🎯 Minimum: ${stockData.minStock} units`);
+  
+  showStockNotification(stockData);
+}
+
+// Handle stats update event
+function handleStatsUpdate(stats) {
+  debugLog(`📊 Stats Update Received`);
+  
+  // Update stats if they exist on the page
+  updateStatsDisplay(stats);
+}
+
+// Update dashboard with new order
+function updateDashboardWithNewOrder(order) {
+  debugLog(`📊 Updating dashboard with order ${order.orderNumber}`);
+  
+  // Update Today's Orders table
+  const tableBody = document.getElementById('ordersTableBody');
+  if (tableBody) {
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+      <td>${order.orderNumber}</td>
+      <td>${new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</td>
+      <td>${order.customerId || 'Walk-in'}</td>
+      <td>₱${order.total.toFixed(2)}</td>
+    `;
+    
+    // Add at the top
+    if (tableBody.firstChild) {
+      tableBody.insertBefore(newRow, tableBody.firstChild);
+    } else {
+      tableBody.appendChild(newRow);
+    }
+    
+    // Keep only 5 rows
+    if (tableBody.children.length > 5) {
+      tableBody.removeChild(tableBody.lastChild);
+    }
+  }
+  
+  // Update order count
+  updateOrderCounts();
+}
+
+// Show order notification
+function showOrderNotification(order) {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: white;
+    border-left: 4px solid #4CAF50;
+    border-radius: 8px;
+    padding: 15px;
+    width: 300px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 9999;
+    animation: slideIn 0.3s ease-out;
+    font-family: 'Arial', sans-serif;
+    font-size: 14px;
+  `;
+  
+  notification.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px;">🆕</span>
+        <strong style="color: #333; font-size: 16px;">New Order!</strong>
+      </div>
+      <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; font-size: 18px; cursor: pointer; color: #999;">×</button>
+    </div>
+    <div style="font-size: 13px; line-height: 1.5;">
+      <div style="margin: 5px 0; display: flex; justify-content: space-between;">
+        <span style="color: #666;">Order #:</span>
+        <span style="font-weight: 600;">${order.orderNumber}</span>
+      </div>
+      <div style="margin: 5px 0; display: flex; justify-content: space-between;">
+        <span style="color: #666;">Total:</span>
+        <span style="font-weight: 600; color: #4CAF50;">₱${order.total.toFixed(2)}</span>
+      </div>
+      <div style="margin: 5px 0; display: flex; justify-content: space-between;">
+        <span style="color: #666;">Customer:</span>
+        <span>${order.customerId || 'Walk-in'}</span>
+      </div>
+      <div style="margin: 5px 0; display: flex; justify-content: space-between;">
+        <span style="color: #666;">Type:</span>
+        <span>${order.type || 'Dine In'}</span>
+      </div>
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; text-align: center; font-size: 11px; color: #888;">
+        ${BUSINESS_INFO.name}
+        <div>${new Date().toLocaleTimeString('en-PH')}</div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Auto-remove after 10 seconds
+  setTimeout(() => {
+    if (notification.parentElement) {
+      notification.remove();
+    }
+  }, 10000);
+}
+
+// Show stock notification
+function showStockNotification(stockData) {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    background: white;
+    border-left: 4px solid #ff9800;
+    border-radius: 8px;
+    padding: 15px;
+    width: 300px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 9998;
+    animation: slideIn 0.3s ease-out;
+    font-family: 'Arial', sans-serif;
+    font-size: 14px;
+  `;
+  
+  notification.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: #ff9800; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px;">⚠️</span>
+        <strong style="color: #333; font-size: 16px;">Low Stock Alert</strong>
+      </div>
+      <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; font-size: 18px; cursor: pointer; color: #999;">×</button>
+    </div>
+    <div style="font-size: 13px; line-height: 1.5;">
+      <div style="margin: 5px 0;">
+        <strong>${stockData.itemName}</strong>
+      </div>
+      <div style="margin: 5px 0; display: flex; justify-content: space-between;">
+        <span style="color: #666;">Current Stock:</span>
+        <span style="font-weight: 600; color: ${stockData.currentStock === 0 ? '#f44336' : '#ff9800'};">${stockData.currentStock} units</span>
+      </div>
+      <div style="margin: 5px 0; display: flex; justify-content: space-between;">
+        <span style="color: #666;">Minimum Required:</span>
+        <span>${stockData.minStock} units</span>
+      </div>
+      <div style="margin-top: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; font-size: 12px; color: #856404;">
+        <strong>Action Required:</strong> Please restock this item
+      </div>
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; text-align: center; font-size: 11px; color: #888;">
+        ${new Date().toLocaleTimeString('en-PH')}
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Auto-remove after 15 seconds
+  setTimeout(() => {
+    if (notification.parentElement) {
+      notification.remove();
+    }
+  }, 15000);
+}
+
+// Update stats display
+function updateStatsDisplay(stats) {
+  // Update total orders
+  const totalOrdersEl = document.getElementById('totalOrders');
+  if (totalOrdersEl && stats.totalOrders !== undefined) {
+    totalOrdersEl.textContent = stats.totalOrders;
+    animateValue(totalOrdersEl);
+  }
+  
+  // Update today's orders
+  const todayOrdersEl = document.getElementById('todayOrders') || document.getElementById('todaysOrders');
+  if (todayOrdersEl && stats.todaysOrders !== undefined) {
+    todayOrdersEl.textContent = stats.todaysOrders;
+    animateValue(todayOrdersEl);
+  }
+  
+  // Update total revenue
+  const totalRevenueEl = document.getElementById('totalRevenue');
+  if (totalRevenueEl && stats.totalRevenue !== undefined) {
+    totalRevenueEl.textContent = `₱${stats.totalRevenue.toFixed(2)}`;
+    animateValue(totalRevenueEl);
+  }
+  
+  // Update today's revenue
+  const todayRevenueEl = document.getElementById('todayRevenue') || document.getElementById('todaysRevenue');
+  if (todayRevenueEl && stats.todaysRevenue !== undefined) {
+    todayRevenueEl.textContent = `₱${stats.todaysRevenue.toFixed(2)}`;
+    animateValue(todayRevenueEl);
+  }
+  
+  // Update inventory counts
+  const lowStockEl = document.getElementById('lowStockItems');
+  if (lowStockEl && stats.inventoryLowStock !== undefined) {
+    lowStockEl.textContent = stats.inventoryLowStock;
+    if (stats.inventoryLowStock > 0) {
+      lowStockEl.style.color = '#ff9800';
+    }
+  }
+  
+  const outOfStockEl = document.getElementById('outOfStockItems');
+  if (outOfStockEl && stats.inventoryOutOfStock !== undefined) {
+    outOfStockEl.textContent = stats.inventoryOutOfStock;
+    if (stats.inventoryOutOfStock > 0) {
+      outOfStockEl.style.color = '#f44336';
+    }
+  }
+}
+
+// Update order counts
+function updateOrderCounts() {
+  const tableBody = document.getElementById('ordersTableBody');
+  if (!tableBody) return;
+  
+  const orderCount = tableBody.children.length;
+  const todayOrdersEl = document.getElementById('todayOrders') || document.getElementById('todaysOrders');
+  
+  if (todayOrdersEl) {
+    const currentCount = parseInt(todayOrdersEl.textContent) || 0;
+    todayOrdersEl.textContent = currentCount + 1;
+    animateValue(todayOrdersEl);
+  }
+  
+  const totalOrdersEl = document.getElementById('totalOrders');
+  if (totalOrdersEl) {
+    const currentCount = parseInt(totalOrdersEl.textContent) || 0;
+    totalOrdersEl.textContent = currentCount + 1;
+    animateValue(totalOrdersEl);
+  }
+}
+
+// Animation for value changes
+function animateValue(element) {
+  element.style.transform = 'scale(1.1)';
+  element.style.transition = 'transform 0.2s ease';
+  
+  setTimeout(() => {
+    element.style.transform = 'scale(1)';
+  }, 200);
+}
+
+// Test the real-time system
+async function testRealTimeSystem() {
+  debugLog('🧪 Testing real-time system...');
+  
+  try {
+    // Test SSE endpoint
+    const response = await fetch('/api/admin/events', {
+      method: 'GET',
+      credentials: 'include'
+    });
+    
+    if (response.status === 200) {
+      debugLog('✅ Real-time endpoint is accessible', 'success');
+      
+      // Test if we can fetch stats
+      const statsResponse = await fetch('/api/dashboard/stats', {
+        credentials: 'include'
+      });
+      
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        debugLog(`📊 Current Stats: ${statsData.data?.todaysOrders || 0} orders today`, 'success');
+      }
+      
+    } else if (response.status === 401) {
+      debugLog('❌ Not authorized - please log in as admin', 'error');
+    } else {
+      debugLog(`❌ Endpoint returned ${response.status}`, 'error');
+    }
+  } catch (error) {
+    debugLog(`❌ Test failed: ${error.message}`, 'error');
+  }
+}
+
+// Initialize everything when page loads
+document.addEventListener('DOMContentLoaded', () => {
+  debugLog('========================================');
+  debugLog('🚀 G\'RAY COUNTRYSIDE CAFÉ Dashboard Initialized');
+  debugLog(`🏪 ${BUSINESS_INFO.name}`);
+  debugLog(`📍 ${BUSINESS_INFO.address}`);
+  debugLog(`🏙️ ${BUSINESS_INFO.city}`);
+  debugLog('========================================');
+  
+  // Check if we're on admin dashboard
+  const isAdminDashboard = window.location.pathname.includes('/admindashboard');
+  
+  if (isAdminDashboard) {
+    debugLog('👨‍💼 Admin Dashboard detected - starting real-time system');
+    
+    // Test the system first
+    testRealTimeSystem();
+    
+    // Start real-time updates after 3 seconds
+    setTimeout(() => {
+      debugLog('🔄 Starting real-time event listener...');
+      testRealTime();
+    }, 3000);
+    
+    // Refresh stats every minute
+    setInterval(async () => {
+      try {
+        const response = await fetch('/api/dashboard/stats', {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            updateStatsDisplay(data.data);
+            debugLog('📊 Periodic stats refresh complete');
+          }
+        }
+      } catch (error) {
+        debugLog(`❌ Periodic refresh failed: ${error.message}`, 'error');
+      }
+    }, 60000);
+    
+  } else {
+    debugLog('👨‍🍳 Staff Dashboard detected - real-time features limited');
+  }
+  
+  // Add animation styles
+  if (!document.getElementById('slideInStyle')) {
+    const style = document.createElement('style');
+    style.id = 'slideInStyle';
+    style.textContent = `
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  if (window._eventSource) {
+    window._eventSource.close();
+    debugLog('🔌 Cleaned up real-time connection');
+  }
+});
+
+// Dashboard data loading
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('G\'RAY COUNTRYSIDE CAFÉ Dashboard loading...');
+    
+    // Initialize dashboard with all data
+    if (typeof initializeDashboard === 'function') {
+        initializeDashboard();
+    }
+    
+    // Fetch dashboard stats
+    fetch('/api/dashboard/stats')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Dashboard stats received:', data);
+            if (data.success) {
+                updateDashboardStats(data.data);
+            } else {
+                showError('Failed to load dashboard stats');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching stats:', error);
+            showError('Failed to load dashboard data: ' + error.message);
+        });
+    
+    function updateDashboardStats(stats) {
+        console.log('Updating dashboard stats:', stats);
+        
+        // Update all stat cards
+        const elements = {
+            'totalOrders': stats.totalOrders || 0,
+            'todayOrders': stats.todaysOrders || 0,
+            'totalCustomers': stats.totalCustomers || 0,
+            'totalMenuItems': stats.totalMenuItems || 0,
+            'availableMenuItems': stats.availableMenuItems || 0,
+            'totalInventory': stats.totalInventoryItems || stats.totalInventory || 0,
+            'lowStockItems': stats.inventoryLowStock || 0,
+            'outOfStockItems': stats.inventoryOutOfStock || 0,
+            'totalRevenue': '₱' + (stats.totalRevenue || 0).toFixed(2),
+            'todayRevenue': '₱' + (stats.todaysRevenue || 0).toFixed(2)
+        };
+        
+        for (const [id, value] of Object.entries(elements)) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value;
+                
+                // Highlight low/out of stock items
+                if ((id === 'lowStockItems' || id === 'outOfStockItems') && value > 0) {
+                    element.style.color = id === 'lowStockItems' ? '#ff9800' : '#f44336';
+                    element.style.fontWeight = '600';
+                }
+            }
+        }
+        
+        // Hide any error messages
+        hideError();
+    }
+    
+    function showError(message) {
+        let errorDiv = document.getElementById('dashboardError');
+        if (!errorDiv) {
+            errorDiv = document.createElement('div');
+            errorDiv.id = 'dashboardError';
+            errorDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #f8d7da;
+                color: #721c24;
+                padding: 12px 20px;
+                border-radius: 4px;
+                border: 1px solid #f5c6cb;
+                z-index: 10000;
+                font-family: Arial, sans-serif;
+                font-size: 14px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            `;
+            document.body.appendChild(errorDiv);
+        }
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+    }
+    
+    function hideError() {
+        const errorDiv = document.getElementById('dashboardError');
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
+    }
+
+    // ==================== 🔐 STORE USER ROLE IN SESSION ====================
+    window.addEventListener('DOMContentLoaded', function() {
+        // Mark user as admin in sessionStorage so new windows know the role
+        sessionManager.setRole('admin');
+        console.log('✅ Admin interface loaded - sessionStorage updated');
+    });
+});
+
+</script>
+<!-- Load session manager and dashboard script -->
+<script src="/script/dashboard.js"></script>
+
