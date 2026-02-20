@@ -3678,9 +3678,10 @@ app.post("/api/stock-requests/fulfill", verifyToken, verifyAdmin, async (req, re
             
             if (menuItem) {
                 const oldStock = menuItem.currentStock || 0;
-                menuItem.currentStock = (menuItem.currentStock || 0) + quantity;
+                // SET the stock to the requested quantity (not add to it)
+                menuItem.currentStock = quantity;
                 await menuItem.save();
-                console.log(`✅ Updated menu item stock: ${oldStock} → ${menuItem.currentStock}`);
+                console.log(`✅ Updated menu item stock: ${oldStock} → ${menuItem.currentStock} (SET to requested quantity)`);
             } else {
                 console.warn(`⚠️ Menu item not found for: ${productName}`);
             }

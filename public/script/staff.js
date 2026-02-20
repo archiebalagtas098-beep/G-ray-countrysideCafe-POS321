@@ -944,7 +944,7 @@ function handleLogout() {
 
 // ==================== 📋 LOAD ALL MENU ITEMS FROM MONGODB ====================
 async function loadAllMenuItems() {
-    console.log('📋 Loading menu items from MongoDB...');
+    // console.log('📋 Loading menu items from MongoDB...');
     
     try {
         const response = await fetch('/api/menu', {
@@ -979,25 +979,24 @@ async function loadAllMenuItems() {
                 };
                 
                 productCatalog.push(product);
-                console.log(`📦 Loaded product: ${product.name} (ID: ${product._id}) - Stock: ${currentStock}`);
+                // console.log(`📦 Loaded product: ${product.name} (ID: ${product._id}) - Stock: ${currentStock}`);
                 
                 if (currentStock <= 0) {
                     outOfStockItems.push(product.name);
                 }
             });
-            
-            console.log(`✅ Loaded ${productCatalog.length} products from MongoDB`);
+            // console.log(`✅ Loaded ${productCatalog.length} products from MongoDB`);
             renderMenu();
             return true;
         }
         
-        console.error('❌ Invalid response from MongoDB:', result);
-        showToast('Failed to load menu from database', 'error');
+        showToast('❌ Invalid database response', 'error', 3000);
+        // console.error('❌ Invalid response from MongoDB:', result);
         return false;
         
     } catch (error) {
-        console.error('❌ Error loading menu from MongoDB:', error);
-        showToast(`Database connection error: ${error.message}`, 'error');
+        showToast(`❌ Database error: ${error.message}`, 'error', 3000);
+        // console.error('❌ Error loading menu from MongoDB:', error);
         return false;
     }
 }
@@ -1094,7 +1093,7 @@ function createProductCard(product) {
 // ==================== UPDATE STOCK IN MONGODB ====================
 async function updateStockInMongoDB(productId, newStock) {
     try {
-        console.log(`🔄 Sending stock update: Product ${productId}, New Stock: ${newStock}`);
+        // console.log(`🔄 Sending stock update: Product ${productId}, New Stock: ${newStock}`);
         
         const response = await fetch(`/api/menu/${productId}/stock`, {
             method: 'PUT',
@@ -1104,18 +1103,20 @@ async function updateStockInMongoDB(productId, newStock) {
         });
 
         if (!response.ok) {
-            console.error(`❌ Failed to update stock for product ${productId}: ${response.status}`);
+            // console.error(`❌ Failed to update stock for product ${productId}: ${response.status}`);
             const errorData = await response.json();
-            console.error('Error details:', errorData);
+            // console.error('Error details:', errorData);
+            showToast(`⚠️ Stock update failed`, 'warning', 2000);
             return false;
         }
 
         const result = await response.json();
-        console.log(`✅ Stock PERSISTED in MongoDB for ${productId}: ${newStock} units`);
-        console.log('Server Response:', result);
+        // console.log(`✅ Stock PERSISTED in MongoDB for ${productId}: ${newStock} units`);
+        // console.log('Server Response:', result);
         return true;
     } catch (error) {
-        console.error(`❌ Error updating stock in MongoDB:`, error);
+        // console.error(`❌ Error updating stock in MongoDB:`, error);
+        showToast(`⚠️ Error updating stock`, 'warning', 2000);
         return false;
     }
 }
@@ -1285,7 +1286,6 @@ function setTableNumber() {
     const input = document.getElementById('tableNumber');
     tableNumber = input.value.trim();
     if (tableNumber) {
-        showToast(`Table #${tableNumber} selected`, 'success', 2000);
     }
     updatePayButtonState();
 }
@@ -1413,6 +1413,161 @@ function updatePayButtonState() {
 }
 
 // ==================== 💰 PROCESS PAYMENT ====================
+// ==================== CUSTOM PAYMENT CONFIRMATION MODAL ====================
+function showPaymentConfirmation(paymentDetails) {
+    return new Promise((resolve) => {
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        `;
+        
+        // Create modal container
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            font-family: Arial, sans-serif;
+        `;
+        
+        // Create title
+        const title = document.createElement('h2');
+        title.textContent = 'Confirm Payment';
+        title.style.cssText = `
+            margin: 0 0 20px 0;
+            color: #333;
+            text-align: center;
+            font-size: 20px;
+        `;
+        
+        // Create details container
+        const details = document.createElement('div');
+        details.style.cssText = `
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            line-height: 1.8;
+        `;
+        
+        let detailsHTML = `
+            <div style="font-size: 14px; color: #555;">
+                <strong style="color: #333; display: block; margin-bottom: 10px;">Order: ${paymentDetails.orderType}</strong>
+        `;
+        
+        if (paymentDetails.orderType === 'Dine In') {
+            detailsHTML += `<div style="margin-bottom: 8px;"><span style="color: #666;">Table #${paymentDetails.tableNumber}</span></div>`;
+        }
+        
+        detailsHTML += `
+                <div style="border-top: 1px solid #ddd; padding-top: 10px; margin-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span>Total:</span>
+                        <strong style="color: #2196f3;">₱${paymentDetails.total.toFixed(2)}</strong>
+                    </div>
+        `;
+        
+        if (paymentDetails.method === 'cash') {
+            detailsHTML += `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span>Payment:</span>
+                        <strong>₱${paymentDetails.amountPaid.toFixed(2)}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; background: #e8f5e9; padding: 8px; border-radius: 4px; margin-top: 8px;">
+                        <span>Change:</span>
+                        <strong style="color: #28a745;">₱${paymentDetails.change.toFixed(2)}</strong>
+                    </div>
+            `;
+        }
+        
+        detailsHTML += `
+                </div>
+            </div>
+        `;
+        
+        details.innerHTML = detailsHTML;
+        
+        // Create buttons container
+        const buttonsContainer = document.createElement('div');
+        buttonsContainer.style.cssText = `
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+        `;
+        
+        // Confirm button
+        const confirmBtn = document.createElement('button');
+        confirmBtn.textContent = '✓ Confirm';
+        confirmBtn.style.cssText = `
+            flex: 1;
+            padding: 12px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        `;
+        confirmBtn.onmouseover = () => confirmBtn.style.background = '#218838';
+        confirmBtn.onmouseout = () => confirmBtn.style.background = '#28a745';
+        confirmBtn.onclick = () => {
+            overlay.remove();
+            resolve(true);
+        };
+        
+        // Cancel button
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = '✕ Cancel';
+        cancelBtn.style.cssText = `
+            flex: 1;
+            padding: 12px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        `;
+        cancelBtn.onmouseover = () => cancelBtn.style.background = '#c82333';
+        cancelBtn.onmouseout = () => cancelBtn.style.background = '#dc3545';
+        cancelBtn.onclick = () => {
+            overlay.remove();
+            resolve(false);
+        };
+        
+        // Assemble modal
+        buttonsContainer.appendChild(confirmBtn);
+        buttonsContainer.appendChild(cancelBtn);
+        
+        modal.appendChild(title);
+        modal.appendChild(details);
+        modal.appendChild(buttonsContainer);
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        // Focus on confirm button
+        confirmBtn.focus();
+    });
+}
+
 async function Payment() {
     if (!currentOrder.length) {
         alert("Please add items to order");
@@ -1448,17 +1603,25 @@ async function Payment() {
     
     const change = selectedPaymentMethod === 'cash' ? paymentAmount - total : 0;
     
-    // Show payment confirmation pop-up
-    const paymentSummary = selectedPaymentMethod === 'gcash' 
-        ? `GCASH PAYMENT\n\nOrder: ${orderType}${orderType === 'Dine In' ? `\nTable #${tableNumber}` : ''}\nTotal: ₱${total.toFixed(2)}\n\nProceed with GCash payment?`
-        : `CASH PAYMENT\n\nOrder: ${orderType}${orderType === 'Dine In' ? `\nTable #${tableNumber}` : ''}\nTotal: ₱${total.toFixed(2)}\nPayment: ₱${paymentAmount.toFixed(2)}\nChange: ₱${change.toFixed(2)}\n\nProceed with payment?`;
+    // Show custom payment confirmation modal
+    const paymentConfirmed = await showPaymentConfirmation({
+        orderType: orderType,
+        tableNumber: tableNumber,
+        total: total,
+        method: selectedPaymentMethod,
+        amountPaid: selectedPaymentMethod === 'cash' ? paymentAmount : total,
+        change: change
+    });
     
-    if (!confirm(paymentSummary)) {
+    if (!paymentConfirmed) {
         return;
     }
     
     try {
         // 1️⃣ SAVE ORDER TO DATABASE
+        // ✅ Map GCash to 'online' for valid enum value
+        const paymentMethod = selectedPaymentMethod === 'gcash' ? 'online' : selectedPaymentMethod;
+        
         const orderPayload = {
             items: currentOrder.map(item => ({
                 id: item.id,
@@ -1474,13 +1637,13 @@ async function Payment() {
             type: orderType,
             tableNumber: orderType === 'Dine In' ? tableNumber : null,
             payment: {
-                method: selectedPaymentMethod,
+                method: paymentMethod,
                 amountPaid: selectedPaymentMethod === 'cash' ? paymentAmount : total
             },
             notes: ''
         };
         
-        console.log('💾 Saving order to database:', orderPayload);
+        // console.log('💾 Saving order to database:', orderPayload);
         
         const saveResponse = await fetch('/api/orders', {
             method: 'POST',
@@ -1496,7 +1659,7 @@ async function Payment() {
         }
         
         const savedOrder = await saveResponse.json();
-        console.log('✅ Order saved successfully:', savedOrder);
+        // console.log('✅ Order saved successfully:', savedOrder);
         
         // 2️⃣ Generate and print receipt
         const receiptNumber = `RCP-${Date.now().toString().slice(-8)}`;
@@ -1512,8 +1675,8 @@ async function Payment() {
         clearOrderAfterPayment();
                
     } catch (error) {
-        console.error('❌ Error processing payment:', error);
-        alert(`❌ Failed to process payment: ${error.message}`);
+        // console.error('❌ Error processing payment:', error);
+        showToast(`❌ Payment error: ${error.message}`, 'error', 3000);
     }
 }
 
@@ -1574,55 +1737,75 @@ function clearOrderAfterPayment() {
 }
 
 // ==================== 🧾 GENERATE RECEIPT HTML ====================
-// ==================== 🧾 GENERATE RECEIPT HTML ====================
 function generateReceiptHTML(receiptNumber, total, change, gcashRef = '') {
-    const timestamp = new Date().toLocaleString('en-PH', { 
-        year: 'numeric',
+    const timestamp = new Date();
+    const dateStr = timestamp.toLocaleDateString('en-US', { 
         month: '2-digit',
         day: '2-digit',
+        year: 'numeric'
+    });
+    const timeStr = timestamp.toLocaleTimeString('en-US', { 
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit'
+        hour12: false
     });
     
     let itemsHTML = '';
+    let subtotal = 0;
     
     currentOrder.forEach(item => {
         const itemTotal = item.price * item.quantity;
-        const itemName = item.name.length > 28 ? item.name.substring(0, 25) + '...' : item.name;
+        subtotal += itemTotal;
+        const itemName = item.itemName || item.name;
+        
+        // Split item name for better formatting
+        const nameParts = itemName.split(' ');
+        let formattedName = itemName;
         
         itemsHTML += `
             <div class="receipt-item">
-                <div class="item-name">${itemName}</div>
-                <div class="item-details">
-                    <span>x${item.quantity}</span>
-                    <span>₱${itemTotal.toFixed(2)}</span>
-                </div>
+                <span class="item-name">${itemName}</span>
+                <span class="item-price">PHP ${itemTotal.toFixed(2)}</span>
             </div>
         `;
     });
     
-    const paymentMethodDisplay = selectedPaymentMethod === 'cash' ? 'CASH' : 'GCASH';
-    const gcashInfo = selectedPaymentMethod === 'gcash' ? `
-        <div class="gcash-ref">Ref: ${gcashRef}</div>
-    ` : '';
+    // VAT Computation (12%) - VAT INCLUSIVE
+    const totalDue = subtotal;
+    const vatAmount = totalDue * (0.12 / 1.12);
+    const vatableSales = totalDue - vatAmount;
+    
+    const amountPaid = selectedPaymentMethod === 'cash' ? paymentAmount : totalDue;
     
     const changeDisplay = selectedPaymentMethod === 'cash' ? `
-        <div class="summary-row">
-            <span>PAYMENT RECEIVED:</span>
-            <span>₱${(total + change).toFixed(2)}</span>
+        <div class="payment-row">
+            <span>CASH</span>
+            <span>PHP ${amountPaid.toFixed(2)}</span>
         </div>
-        <div class="summary-row change-row">
-            <span>CHANGE:</span>
-            <span>₱${change.toFixed(2)}</span>
+        <div class="payment-row">
+            <span>CHANGE</span>
+            <span>PHP ${change.toFixed(2)}</span>
+        </div>
+    ` : selectedPaymentMethod === 'gcash' ? `
+        <div class="payment-row">
+            <span>GCASH</span>
+            <span>PHP ${totalDue.toFixed(2)}</span>
+        </div>
+        <div class="payment-row">
+            <span>REF NO.</span>
+            <span>${gcashRef || 'N/A'}</span>
         </div>
     ` : '';
     
     const tableInfo = orderType === 'Dine In' ? `
-        <div class="table-info">TABLE #${tableNumber}</div>
+        <div class="info-row">Order Type: Dine In (Table: ${tableNumber})</div>
     ` : `
-        <div class="table-info">TAKE OUT</div>
+        <div class="info-row">Order Type: Take Out</div>
     `;
+    
+    // Generate transaction number
+    const transNumber = `TRX-${Math.floor(Math.random() * 100000000)}`;
+    const receiptDateTime = `${timestamp.getFullYear()}${(timestamp.getMonth()+1).toString().padStart(2,'0')}${timestamp.getDate().toString().padStart(2,'0')}-${timeStr.replace(':','')}-00000`;
     
     return `
         <!DOCTYPE html>
@@ -1652,236 +1835,222 @@ function generateReceiptHTML(receiptNumber, total, change, gcashRef = '') {
                     width: 80mm;
                     max-width: 80mm;
                     background: white;
-                    padding: 15px 10px;
+                    padding: 10px;
                     margin: 0 auto;
                     box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                    font-size: 12px;
+                    line-height: 1.4;
                 }
                 
-                /* Header Section */
+                /* HEADER - Center aligned */
                 .header {
-                    text-align: center;
-                    margin-bottom: 15px;
-                }
-                
-                .restaurant-name {
-                    font-size: 20px;
-                    font-weight: bold;
-                    letter-spacing: 1px;
-                    margin-bottom: 3px;
-                    text-align: center;
-                }
-                
-                .restaurant-sub {
-                    font-size: 14px;
                     text-align: center;
                     margin-bottom: 10px;
                 }
                 
-                /* Info Section */
-                .receipt-info {
-                    text-align: center;
-                    border-top: 1px dashed #000;
-                    border-bottom: 1px dashed #000;
-                    padding: 8px 0;
-                    margin: 10px 0;
+                .restaurant-name {
+                    font-size: 16px;
+                    font-weight: bold;
+                    margin-bottom: 2px;
                 }
                 
-                .receipt-info div {
-                    text-align: center;
+                .header div {
+                    margin: 1px 0;
+                }
+                
+                /* Divider */
+                .divider {
+                    border-top: 1px dashed #000;
+                    margin: 8px 0;
+                }
+                
+                /* Info Section - Justified */
+                .info-row {
+                    display: flex;
+                    justify-content: space-between;
                     margin: 2px 0;
                 }
                 
-                .table-info {
-                    text-align: center;
-                    font-weight: bold;
-                    font-size: 16px;
-                    padding: 8px 0;
-                    border-bottom: 1px solid #000;
-                    border-top: 1px solid #000;
-                    margin: 10px 0;
-                }
-                
-                /* Items Section */
-                .items-section {
-                    margin: 15px 0;
+                /* Items Section - Justified */
+                .items-header {
+                    text-align: left;
+                    margin: 5px 0 2px 0;
                 }
                 
                 .receipt-item {
-                    text-align: center;
-                    padding: 5px 0;
-                    border-bottom: 1px dotted #000;
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 4px 0;
+                    text-align: justify;
                 }
                 
                 .item-name {
-                    text-align: center;
-                    font-weight: bold;
-                    margin-bottom: 3px;
+                    text-align: left;
+                    flex: 2;
+                    white-space: pre-wrap;
                 }
                 
-                .item-details {
-                    display: flex;
-                    justify-content: center;
-                    gap: 30px;
-                    font-size: 11px;
+                .item-price {
+                    text-align: right;
+                    flex: 1;
                 }
                 
-                /* Summary Section */
-                .summary-section {
-                    margin: 15px 0;
-                    border-top: 2px solid #000;
-                    border-bottom: 2px solid #000;
-                    padding: 10px 0;
-                }
-                
+                /* Totals Section - Justified */
                 .summary-row {
                     display: flex;
-                    justify-content: center;
-                    gap: 30px;
-                    padding: 3px 0;
-                    text-align: center;
+                    justify-content: space-between;
+                    margin: 2px 0;
                 }
                 
                 .summary-row.total {
                     font-weight: bold;
-                    font-size: 16px;
-                    border-top: 1px solid #000;
-                    border-bottom: 1px solid #000;
-                    padding: 8px 0;
-                    margin: 5px 0;
-                }
-                
-                .change-row {
-                    font-weight: bold;
-                }
-                
-                /* Payment Section */
-                .payment-section {
-                    text-align: center;
-                    margin: 15px 0;
-                    padding: 10px 0;
-                    border-top: 1px dashed #000;
-                    border-bottom: 1px dashed #000;
-                }
-                
-                .payment-method {
-                    font-weight: bold;
-                    font-size: 14px;
-                    margin-bottom: 5px;
-                }
-                
-                .gcash-ref {
-                    font-size: 11px;
                     margin-top: 5px;
                 }
                 
-                /* Footer Section */
+                /* Payment Section - Justified */
+                .payment-row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 2px 0;
+                }
+                
+                /* VAT Section - Justified */
+                .vat-header {
+                    text-align: left;
+                    margin: 5px 0 2px 0;
+                }
+                
+                .vat-row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 2px 0;
+                }
+                
+                /* Footer - Center aligned */
                 .footer {
                     text-align: center;
-                    margin-top: 20px;
-                    padding-top: 10px;
-                    border-top: 2px solid #000;
+                    margin-top: 10px;
                 }
                 
                 .thank-you {
-                    font-size: 18px;
                     font-weight: bold;
-                    margin-bottom: 8px;
-                }
-                
-                .footer-text {
-                    font-size: 12px;
-                    margin: 3px 0;
+                    margin: 5px 0;
                 }
                 
                 .footer-small {
                     font-size: 10px;
-                    margin-top: 8px;
                 }
                 
-                /* Center all text */
-                div, p, span, h1, h2, h3 {
-                    text-align: center !important;
+                /* Ensure proper spacing */
+                .section-title {
+                    text-align: left;
+                    margin: 5px 0 2px 0;
                 }
                 
                 @media print {
                     @page {
                         size: 80mm auto;
                         margin: 0;
-                        padding: 0;
-                    }
-                    
-                    html, body {
-                        width: 80mm;
-                        margin: 0;
-                        padding: 0;
-                        display: block;
                     }
                     
                     body {
                         padding: 0;
                         background: white;
-                        display: block;
-                        margin: 0;
                     }
                     
                     .receipt-container {
                         box-shadow: none;
-                        padding: 10px 5px;
-                        width: 80mm;
-                        margin: 0;
                     }
                 }
             </style>
         </head>
         <body>
             <div class="receipt-container">
-                <!-- HEADER -->
+                <!-- HEADER - CENTERED -->
                 <div class="header">
-                    <div class="restaurant-name">G-RAY COUNTRYSIDE</div>
-                    <div class="restaurant-sub">CAFE & RESTAURANT</div>
+                    <div class="restaurant-name">GRAY COUNTRYSIDE CAFE</div>
+                    <div>JD Building, Crossing, Norzagaray,</div>
+                    <div>Bulacan, Philippines, 3013</div>
+                    <div>TIN: 000-000-000-000</div>
+                    <div>POS: POS001 | MIN#: 1769767525781</div>
                 </div>
                 
-                <!-- RECEIPT INFO -->
-                <div class="receipt-info">
-                    <div>Receipt: ${receiptNumber}</div>
-                    <div>${timestamp}</div>
+                <div class="divider"></div>
+                
+                <!-- RECEIPT INFO - JUSTIFIED -->
+                <div class="info-row">
+                    <span>RECEIPT</span>
+                </div>
+                <div class="info-row">
+                    <span>Trans#: ${transNumber}</span>
+                </div>
+                <div class="info-row">
+                    <span>Cashier: CASHIER001</span>
+                </div>
+                <div class="info-row">
+                    <span>Date: ${dateStr} ${timeStr} #02</span>
                 </div>
                 
-                <!-- TABLE/ORDER INFO -->
+                <div class="divider"></div>
+                
+                <!-- ORDER TYPE - JUSTIFIED -->
                 ${tableInfo}
                 
-                <!-- ORDER ITEMS -->
-                <div class="items-section">
+                <div class="divider"></div>
+                
+                <!-- ITEMS HEADER -->
+                <div class="items-header">Items:</div>
+                
+                <!-- ORDER ITEMS - JUSTIFIED -->
+                <div>
                     ${itemsHTML}
                 </div>
                 
-                <!-- SUMMARY -->
-                <div class="summary-section">
-                    <div class="summary-row">
-                        <span>SUBTOTAL</span>
-                        <span>₱${total.toFixed(2)}</span>
-                    </div>
-                    
-                    ${changeDisplay}
-                    
-                    <div class="summary-row total">
-                        <span>TOTAL</span>
-                        <span>₱${total.toFixed(2)}</span>
-                    </div>
+                <div class="divider"></div>
+                
+                <!-- TOTALS - JUSTIFIED -->
+                <div class="summary-row">
+                    <span>SUB-TOTAL</span>
+                    <span>PHP ${totalDue.toFixed(2)}</span>
+                </div>
+                <div class="summary-row total">
+                    <span>TOTAL DUE</span>
+                    <span>PHP ${totalDue.toFixed(2)}</span>
                 </div>
                 
-                <!-- PAYMENT INFO -->
-                <div class="payment-section">
-                    <div class="payment-method">Payment: ${paymentMethodDisplay}</div>
-                    ${gcashInfo}
+                <div class="divider"></div>
+                
+                <!-- PAYMENT - JUSTIFIED -->
+                <div class="section-title">Payment:</div>
+                ${changeDisplay}
+                
+                <div class="divider"></div>
+                
+                <!-- VAT BREAKDOWN - JUSTIFIED -->
+                <div class="vat-header">VAT Breakdown:</div>
+                <div class="vat-row">
+                    <span>VATable Sales</span>
+                    <span>${vatableSales.toFixed(2)}</span>
+                </div>
+                <div class="vat-row">
+                    <span>VAT Amount (12%)</span>
+                    <span>${vatAmount.toFixed(2)}</span>
+                </div>
+                <div class="vat-row">
+                    <span>Zero-Rated Sales</span>
+                    <span>0.00</span>
+                </div>
+                <div class="vat-row">
+                    <span>VAT Exempt Sales</span>
+                    <span>0.00</span>
                 </div>
                 
-                <!-- FOOTER -->
+                <div class="divider"></div>
+                
+                <!-- FOOTER - CENTERED -->
                 <div class="footer">
-                    <div class="thank-you">THANK YOU!</div>
-                    <div class="footer-text">G-Ray Countryside Cafe</div>
-                    <div class="footer-small">Please come again!</div>
-                    <div class="footer-small">${new Date().toLocaleDateString()}, ${new Date().toLocaleTimeString()} Receipt ${receiptNumber}</div>
+                    <div class="thank-you">THANK YOU. PLEASE COME AGAIN.</div>
+                    <div class="footer-small">${receiptDateTime}</div>
                 </div>
             </div>
             
@@ -1889,16 +2058,11 @@ function generateReceiptHTML(receiptNumber, total, change, gcashRef = '') {
                 window.onload = function() {
                     window.print();
                 };
-                
-                window.onafterprint = function() {
-                    window.close();
-                };
             </script>
         </body>
         </html>
     `;
 }
-
 // ==================== 🖨️ PRINT RECEIPT ====================
 function printReceipt(receiptHTML) {
     const printWindow = window.open('', 'receipt', 'width=400,height=600');
@@ -1907,11 +2071,11 @@ function printReceipt(receiptHTML) {
     
     // Close window after print completes
     printWindow.onbeforeprint = function() {
-        console.log('📄 Print started...');
+        // console.log('📄 Print started...');
     };
     
     printWindow.onafterprint = function() {
-        console.log('📄 Print completed, closing window...');
+        // console.log('📄 Print completed, closing window...');
         setTimeout(() => {
             printWindow.close();
         }, 300);
@@ -1920,7 +2084,7 @@ function printReceipt(receiptHTML) {
 
 // ==================== 📦 STOCK REQUEST FUNCTIONS ====================
 function requestStock(productId) {
-    console.log('🛒 Requesting stock for ID:', productId);
+    // console.log('🛒 Requesting stock for ID:', productId);
     
     // Get the product name from the page (from the table row)
     // The productId is a numeric ID, we need to find the actual product name
@@ -1988,57 +2152,188 @@ function requestStock(productId) {
     const productName = stockItem ? stockItem.name : null;
     
     if (!productName) {
-        console.error('❌ Product not found with ID:', productId);
+        // console.error('❌ Product not found with ID:', productId);
         showToast('❌ Product not found', 'error', 3000);
         return;
     }
     
-    console.log('✅ Found product:', productName);
+    // console.log('✅ Found product:', productName);
     
-    // Now request the stock
-    const quantity = prompt(`Enter quantity to request for ${productName}:`, "10");
-    if (quantity && quantity.trim()) {
-        const quantityNum = parseInt(quantity);
-        
-        // Save to MongoDB via API
-        fetch('/api/stock-requests', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                productName: productName,
-                requestedQuantity: quantityNum,
-                requestedBy: 'Staff',
-                status: 'pending'
-            })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                console.log('✅ Stock request saved to MongoDB:', data);
-                if (data.updated) {
-                    showToast(`🔄 Updated stock request for ${quantityNum} of ${productName}!`, 'success', 4000);
-                } else {
-                    showToast(`✅ Stock request for ${quantityNum} of ${productName} sent to admin!`, 'success', 4000);
-                }
+    // Show custom modal for quantity input
+    showStockRequestModal(productName);
+}
+
+// ==================== CUSTOM STOCK REQUEST MODAL ====================
+function showStockRequestModal(productName) {
+    // Remove any existing modal
+    const existingModal = document.getElementById('stockRequestModal');
+    if (existingModal) existingModal.remove();
+    
+    // Create modal HTML
+    const modalHTML = `
+        <div id="stockRequestModal" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        ">
+            <div style="
+                background: white;
+                border-radius: 12px;
+                padding: 30px;
+                width: 90%;
+                max-width: 400px;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            ">
+                <h2 style="margin: 0 0 20px; color: #333; font-size: 20px;">📦 Stock Request</h2>
                 
-                // Increment request count for badge
-                const count = (parseInt(localStorage.getItem('stockRequestCount')) || 0) + 1;
-                localStorage.setItem('stockRequestCount', count);
-                updateStockRequestNotification();
-            } else {
-                throw new Error(data.message || 'Failed to save request');
-            }
-        })
-        .catch(err => {
-            console.error('❌ Error saving stock request:', err);
-            showToast('❌ Failed to save stock request: ' + err.message, 'error', 3000);
-        });
-        
-        if (!pendingStockRequests.includes(productName)) {
-            pendingStockRequests.push(productName);
+                <p style="margin: 0 0 15px; color: #666; font-size: 14px;">
+                    Enter quantity to request for:
+                </p>
+                
+                <div style="
+                    background: #f5f5f5;
+                    padding: 12px;
+                    border-radius: 8px;
+                    margin-bottom: 20px;
+                    font-weight: bold;
+                    color: #0b5e8a;
+                    text-align: center;
+                ">
+                    ${productName}
+                </div>
+                
+                <input type="number" id="quantityInput" placeholder="Enter quantity" value="10" 
+                    style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #ddd;
+                        border-radius: 8px;
+                        font-size: 16px;
+                        box-sizing: border-box;
+                        margin-bottom: 20px;
+                    "
+                    min="1" 
+                    max="1000"
+                />
+                
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="submitStockRequest('${productName}')" style="
+                        flex: 1;
+                        background: #28a745;
+                        color: white;
+                        border: none;
+                        padding: 12px;
+                        border-radius: 8px;
+                        font-size: 16px;
+                        cursor: pointer;
+                        font-weight: bold;
+                    ">
+                        ✓ Send Request
+                    </button>
+                    
+                    <button onclick="closeStockRequestModal()" style="
+                        flex: 1;
+                        background: #6c757d;
+                        color: white;
+                        border: none;
+                        padding: 12px;
+                        border-radius: 8px;
+                        font-size: 16px;
+                        cursor: pointer;
+                        font-weight: bold;
+                    ">
+                        ✕ Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Insert modal into DOM
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Focus on input and select default value
+    setTimeout(() => {
+        const input = document.getElementById('quantityInput');
+        input.focus();
+        input.select();
+    }, 100);
+    
+    // Allow Enter key to submit
+    document.getElementById('quantityInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            submitStockRequest(productName);
         }
+    });
+}
+
+function closeStockRequestModal() {
+    const modal = document.getElementById('stockRequestModal');
+    if (modal) modal.remove();
+}
+
+function submitStockRequest(productName) {
+    const input = document.getElementById('quantityInput');
+    const quantity = input ? input.value.trim() : '';
+    
+    if (!quantity) {
+        showToast('❌ Please enter a quantity', 'error', 2000);
+        return;
+    }
+    
+    const quantityNum = parseInt(quantity);
+    if (isNaN(quantityNum) || quantityNum <= 0) {
+        showToast('❌ Please enter a valid quantity', 'error', 2000);
+        return;
+    }
+    
+    closeStockRequestModal();
+    
+    // Save to MongoDB via API
+    fetch('/api/stock-requests', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            productName: productName,
+            requestedQuantity: quantityNum,
+            requestedBy: 'Staff',
+            status: 'pending'
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // console.log('✅ Stock request saved to MongoDB:', data);
+            if (data.updated) {
+                showToast(`🔄 Updated request: ${quantityNum} units`, 'success', 3000);
+            } else {
+                showToast(`✅ Stock request sent to admin!`, 'success', 3000);
+            }
+            
+            // Increment request count for badge
+            const count = (parseInt(localStorage.getItem('stockRequestCount')) || 0) + 1;
+            localStorage.setItem('stockRequestCount', count);
+            updateStockRequestNotification();
+        } else {
+            throw new Error(data.message || 'Failed to save request');
+        }
+    })
+    .catch(err => {
+        // console.error('❌ Error saving stock request:', err);
+        showToast(`❌ Request failed: ${err.message}`, 'error', 3000);
+    });
+    
+    if (!pendingStockRequests.includes(productName)) {
+        pendingStockRequests.push(productName);
     }
 }
 
@@ -2054,7 +2349,7 @@ function updateStockRequestNotification() {
             badge.style.display = 'inline-flex';
             badge.style.animation = 'pulse 0.5s ease-in-out';
             
-            console.log('📢 Stock request notification badge updated!');
+            // console.log('📢 Stock request notification badge updated!');
         }
         
         // Also save to localStorage to notify menu.js if on different page/window
@@ -2065,7 +2360,7 @@ function updateStockRequestNotification() {
         console.log('� Stock request saved to localStorage. Count:', stockRequestCount);
         
     } catch (error) {
-        console.log('ℹ️ Badge update error:', error.message);
+        // console.log('Badge update error:', error.message);
     }
 }
 
@@ -2148,12 +2443,12 @@ function loadInventoryFromStorage() {
 
 // ==================== 🚀 INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', async function() {
-    console.log('🚀 Initializing POS System...');
+    // console.log('🚀 Initializing POS System...');
     
     loadInventoryFromStorage();
     await getCurrentUser();
     
-    console.log('📋 Loading menu items from MongoDB...');
+    // console.log('📋 Loading menu items from MongoDB...');
     const menuLoaded = await loadAllMenuItems();
     
     if (!menuLoaded) {
@@ -2222,13 +2517,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     renderMenu();
     updatePayButtonState();
     
-    console.log('✅ POS System initialized');
+    // console.log('✅ POS System initialized');
 });
 
 setInterval(saveInventoryToStorage, 30000);
 
 // ==================== 🎯 EXPORT GLOBAL FUNCTIONS ====================
 window.requestStock = requestStock;
+window.showStockRequestModal = showStockRequestModal;
+window.closeStockRequestModal = closeStockRequestModal;
+window.submitStockRequest = submitStockRequest;
 window.setDineIn = setDineIn;
 window.setTakeout = setTakeout;
 window.selectPaymentMethod = selectPaymentMethod;

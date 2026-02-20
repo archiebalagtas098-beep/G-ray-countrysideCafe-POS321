@@ -388,43 +388,36 @@ if (window.location.pathname.includes('orderhistory')) {
 
     async function loadTopItems() {
         try {
-            console.log('📊 Loading top items from MongoDB...');
+            console.log('📊 Loading top items directly from API...');
             
             if (!topItemsBody) {
                 console.warn('⚠️ topItemsBody element not found');
                 return;
             }
             
-            const response = await fetch('/api/dashboard/stats');
-            if (!response.ok) throw new Error('Failed to load stats');
+            // ✅ ALWAYS fetch directly from the dedicated top-items endpoint
+            const response = await fetch('/api/orders/top-items', {
+                credentials: 'include'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API returned status ${response.status}`);
+            }
             
             const result = await response.json();
-            const stats = result.success ? result.data : {};
-            
-            console.log('📦 Stats received from API:', stats);
+            console.log('📦 Top Items API response:', result);
             
             topItemsBody.innerHTML = '';
             
-            // Get top selling items from response
-            let topProducts = [];
+            // Get top products from API response - supports multiple response formats
+            let topProducts = result.data || result.items || result.topItems || [];
             
-            if (stats.topSellingProducts && Array.isArray(stats.topSellingProducts)) {
-                topProducts = stats.topSellingProducts;
-                console.log(`✅ Found ${topProducts.length} topSellingProducts from API`);
-            } else if (stats.topItems && Array.isArray(stats.topItems)) {
-                topProducts = stats.topItems;
-                console.log(`✅ Found ${topProducts.length} topItems from API`);
-            } else if (stats.topSellingItems && Array.isArray(stats.topSellingItems)) {
-                topProducts = stats.topSellingItems;
-                console.log(`✅ Found ${topProducts.length} topSellingItems from API`);
-            }
-            
-            console.log('📋 Top Products raw data:', topProducts);
+            console.log(`✅ Found ${topProducts.length} top products from API`);
             
             if (topProducts.length > 0) {
                 console.log('📋 Displaying top products from database:', topProducts.length);
                 
-                // Filter out items with invalid names, then take top 5
+                // Filter out items with invalid names
                 const validProducts = topProducts.filter(product => {
                     let name = product._id || product.name || product.productName || product.itemName || '';
                     // Filter out if name is empty, null, 'Unknown', or just an ObjectID-like string
@@ -435,6 +428,9 @@ if (window.location.pathname.includes('orderhistory')) {
                 
                 validProducts.forEach((product, index) => {
                     const row = document.createElement('tr');
+                    row.style.opacity = '0';
+                    row.style.transform = 'translateY(10px)';
+                    row.style.transition = `opacity 0.3s ease ${index * 100}ms, transform 0.3s ease ${index * 100}ms`;
                     
                     // Extract product information
                     let productName = 'Unknown';
@@ -512,6 +508,14 @@ if (window.location.pathname.includes('orderhistory')) {
                         <td><span class="status-badge ${statusClass}">${status}</span></td>
                     `;
                     topItemsBody.appendChild(row);
+                    
+                    // ✅ Trigger animation
+                    setTimeout(() => {
+                        row.style.opacity = '1';
+                        row.style.transform = 'translateY(0)';
+                    }, 10);
+                    
+                    console.log(`  ✅ Item ${index + 1}: ${displayName} - ${formattedRevenue}`);
                 });
                 
             } else {
@@ -529,6 +533,8 @@ if (window.location.pathname.includes('orderhistory')) {
                     </tr>
                 `;
             }
+            
+            console.log('✅ Top items table updated successfully');
             
         } catch (error) {
             console.error('❌ Error loading top items:', error);

@@ -610,10 +610,24 @@
     }
 
     function filterTable(filter) {
+        console.log('🔍 Filtering stock requests by category:', filter);
+        
+        // Update currentStockFilter with the selected filter
+        currentStockFilter = filter;
+        
+        // Update button styles
         document.querySelectorAll('#stockManagementModal .filter-btn').forEach(btn => {
             btn.classList.remove('active');
+            btn.style.background = '#f8f9fa';
+            btn.style.color = '#333';
         });
+        
+        // Mark the clicked button as active
         event.target.classList.add('active');
+        event.target.style.background = '#4CAF50';
+        event.target.style.color = 'white';
+        
+        console.log(`✅ Filter changed to: ${filter}`);
         renderTable();
     }
 
@@ -621,7 +635,7 @@
 
     function saveAllChanges() {
         if (changes.size === 0) {
-            alert('No changes to save.');
+            showToast('❌ No changes to save', 'info', 2000);
             return;
         }
         
@@ -630,19 +644,38 @@
             return `${stock.name}: ${quantity} ${stock.unit}`;
         });
         
-        alert(`Saved ${changes.size} changes:\n\n${changesArray.join('\n')}`);
+        console.log(`✅ Saved ${changes.size} stock changes:`, changesArray);
+        showToast(`✅ Saved ${changes.size} changes!`, 'success', 3000);
         changes.clear();
-        console.log('Changes saved:', Array.from(changes.entries()));
     }
 
     function sendStockBatch() {
-        alert('Send stock batch functionality');
+        if (changes.size === 0) {
+            showToast('❌ No changes to send', 'warning', 2000);
+            return;
+        }
+        
+        console.log('📦 Sending stock batch with', changes.size, 'changes');
+        showToast(`📦 Batch sent with ${changes.size} items!`, 'success', 3000);
+        changes.clear();
     }
 
+    // ✅ Fixed requestStock function - now properly calls the staff.js function
     function requestStock(id) {
         const stock = stocksData.find(item => item.id === id);
-        if (stock) {
-            alert(`Requesting stocks for: ${stock.name}\nCurrent Quantity: ${stock.quantity} ${stock.unit}\nCategory: ${stock.category}`);
+        if (!stock) {
+            showToast('❌ Stock item not found', 'error', 2000);
+            return;
+        }
+        
+        console.log(`📦 Requesting stock for ID: ${id}, Name: ${stock.name}`);
+        
+        // Call the requestStock function from staff.js (imported below)
+        // This will show the modal and allow quantity input
+        if (typeof window.requestStock === 'function') {
+            window.requestStock(id);
+        } else {
+            showToast('❌ Stock request function not available', 'error', 3000);
         }
     }
 

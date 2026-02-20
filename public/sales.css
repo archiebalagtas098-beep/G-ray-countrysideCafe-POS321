@@ -731,4 +731,182 @@ body {
     margin-top: 20px;
   }
 
+  /* ==================== 📊 REVENUE BREAKDOWN SECTION ==================== */
+  .revenue-breakdown-section {
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .breakdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #4e8a6a;
+    padding-bottom: 12px;
+  }
+
+  .breakdown-header h2 {
+    font-size: 18px;
+    color: #0f172a;
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .breakdown-date {
+    font-size: 14px;
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  .breakdown-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    margin-bottom: 20px;
+    background: #f3f4f6;
+    padding: 15px 20px;
+    border-radius: 6px;
+  }
+
+  .breakdown-total p {
+    font-size: 14px;
+    color: #4b5563;
+    font-weight: 500;
+    margin: 0;
+  }
+
+  .breakdown-total-amount {
+    font-size: 24px;
+    font-weight: bold;
+    color: #4e8a6a;
+  }
+
+  .breakdown-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .revenue-breakdown-row {
+    display: grid;
+    grid-template-columns: 200px 1fr 120px;
+    gap: 15px;
+    align-items: center;
+    padding: 12px;
+    background: #f9fafb;
+    border-left: 4px solid #4e8a6a;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    animation: slideInLeft 0.5s ease forwards;
+    opacity: 0;
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .revenue-breakdown-row:hover {
+    background: #eff6ff;
+    box-shadow: 0 2px 4px rgba(78, 138, 106, 0.1);
+  }
+
+  .breakdown-category {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .category-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .category-count {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .breakdown-amounts {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  .breakdown-amount {
+    font-size: 16px;
+    font-weight: bold;
+    color: #4e8a6a;
+  }
+
+  .breakdown-percentage {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .breakdown-bar {
+    display: flex;
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    overflow: hidden;
+    grid-column: 1 / -1;
+  }
+
+  .bar-fill {
+    background: linear-gradient(90deg, #4e8a6a, #6ba88a);
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+    box-shadow: 0 0 4px rgba(78, 138, 106, 0.3);
+  }
+
+  /* Loading and empty states */
+  .breakdown-container p {
+    text-align: center;
+    color: #9ca3af;
+    padding: 20px;
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .revenue-breakdown-row {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .breakdown-amounts {
+      flex-direction: row;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .breakdown-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .breakdown-total {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+  }
+
+  
   

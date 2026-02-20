@@ -31,7 +31,7 @@ const INVENTORY_CACHE_DURATION = 5000;
 const ingredientInventory = {
     'pork': { name: 'Pork', current: 100, max: 500, unit: 'kg', minThreshold: 20 },
     'chicken': { name: 'Chicken', current: 100, max: 300, unit: 'kg', minThreshold: 15 },
-    'beef': { name: 'Beef', current: 50, max: 200, unit: 'kg', minThreshold: 10 },
+    'beef': { name: 'Beef', current: 50, max: 100, unit: 'kg', minThreshold: 10 },
     'shrimp': { name: 'Shrimp', current: 50, max: 100, unit: 'kg', minThreshold: 8 },
     'fish': { name: 'Cream Dory', current: 50, max: 150, unit: 'kg', minThreshold: 10 },
     'pork_belly': { name: 'Pork Belly', current: 50, max: 100, unit: 'kg', minThreshold: 10 },
@@ -78,7 +78,7 @@ const ingredientInventory = {
     'sugar': { name: 'Sugar', current: 30, max: 50, unit: 'kg', minThreshold: 10 },
     'salt': { name: 'Salt', current: 30, max: 50, unit: 'kg', minThreshold: 10 },
     'black_pepper': { name: 'Black Pepper', current: 20, max: 30, unit: 'kg', minThreshold: 5 },
-    'water': { name: 'Water', current: 100, max: 200, unit: 'liter', minThreshold: 30 }
+    'water': { name: 'Water', current: 100, max: 100, unit: 'liter', minThreshold: 30 }
 };
 
 // ==================== SERVINGWARE INVENTORY ====================
@@ -940,58 +940,57 @@ function loadPendingStockRequests() {
 }
 
 // ==================== FULFILL STOCK REQUEST ====================
-function fulfillStockRequest(requestIndex) {
+async function fulfillStockRequest(requestIndex) {
     try {
-        // Get the request from our combined list
-        const allRequests = [
-            ...stockRequestNotifications.filter(r => !r.fulfilled),
-            ...getStaffRequestsFromLocalStorage()
-        ];
+        console.log(`🔄 Fulfilling stock request at index: ${requestIndex}`);
+        showToast('⏳ Marking request as fulfilled...', 'info', 2000);
         
-        if (requestIndex >= allRequests.length) {
+        // Get the request from MongoDB
+        const response = await fetch('/api/stock-requests/pending');
+        if (!response.ok) {
+            throw new Error('Failed to fetch pending requests');
+        }
+        
+        const result = await response.json();
+        const pendingRequests = result.data || [];
+        
+        if (requestIndex >= pendingRequests.length) {
             showToast('❌ Request not found', 'error');
             return;
         }
         
-        const request = allRequests[requestIndex];
+        const request = pendingRequests[requestIndex];
+        console.log(`📦 Fulfilling: ${request.productName} (${request.requestedQuantity} units)`);
         
-        // Mark as fulfilled in stockRequestNotifications if it exists there
-        const localRequest = stockRequestNotifications.find(r => 
-            r.id === request.id || 
-            (r.productName === request.productName && r.timestamp === request.timestamp)
-        );
+        // Call fulfill endpoint
+        const fulfillResponse = await fetch('/api/stock-requests/fulfill', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                productName: request.productName,
+                productId: request.productId,
+                quantity: request.requestedQuantity,
+                unit: request.unit || 'units'
+            })
+        });
         
-        if (localRequest) {
-            localRequest.fulfilled = true;
-            localRequest.read = true;
+        if (!fulfillResponse.ok) {
+            const errorData = await fulfillResponse.json();
+            throw new Error(errorData.message || 'Failed to fulfill request');
         }
         
-        // Remove from localStorage staff requests
-        removeStaffRequestFromLocalStorage(request);
+        const fulfillResult = await fulfillResponse.json();
+        console.log(`✅ Stock request fulfilled:`, fulfillResult);
         
-        // Update counts
-        stockRequestCount = stockRequestNotifications.filter(r => !r.fulfilled).length;
-        updateNotificationBadge();
-        renderNotifications();
-        saveNotificationsToLocalStorage();
+        showToast(`✅ Stock request for ${request.productName} marked as fulfilled!`, 'success', 3000);
         
-        showToast(`✅ Stock request for ${request.productName} fulfilled`, 'success');
-        
-        // Add to regular notifications as completed
-        addNotification(
-            `Stock request for ${request.productName} (${request.quantity} ${request.unit}) has been fulfilled`,
-            'success',
-            request.productName
-        );
-        
-        // Refresh dashboard
-        if (currentSection === 'dashboard') {
-            renderDashboardGrid();
-        }
+        // Refresh the dashboard to remove the fulfilled request
+        await renderDashboardGrid();
         
     } catch (error) {
-        console.error('Error fulfilling stock request:', error);
-        showToast('❌ Error fulfilling request', 'error');
+        console.error('❌ Error fulfilling stock request:', error);
+        showToast(`❌ Error: ${error.message}`, 'error', 3000);
     }
 }
 
@@ -2152,33 +2151,93 @@ function showMissingIngredientsModal(productName, missingIngredients) {
                     text-align: right;
                     border-top: 2px solid #f0f0f0;
                     padding-top: 20px;
+                    display: flex;
+                    gap: 10px;
+                    justify-content: flex-end;
                 ">
-                    <button id="closeMissingIngredientsBtn" class="btn btn-primary" style="
+                    <button id="goToInventoryBtn" class="btn btn-secondary" style="
                         padding: 12px 30px;
-                        background: #dc3545;
+                        background: #6c757d;
                         color: white;
                         border: none;
                         border-radius: 6px;
                         cursor: pointer;
                         font-size: 16px;
                         font-weight: 500;
-                    ">OK, Got It</button>
+                        transition: all 0.3s ease;
+                    " onmouseover="this.style.background='#5a6268'" onmouseout="this.style.background='#6c757d'">
+                        📦 Go to Inventory
+                    </button>
+                    <button id="closeMissingIngredientsBtn" class="btn btn-primary" style="
+                        padding: 12px 30px;
+                        background: #28a745;
+                        color: white;
+                        border: none;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 16px;
+                        font-weight: 500;
+                        transition: all 0.3s ease;
+                    " onmouseover="this.style.background='#218838'" onmouseout="this.style.background='#28a745'">
+                        ✓ Understood
+                    </button>
                 </div>
             </div>
         `;
         
         document.body.appendChild(modal);
-        
-        // Add event listeners
-        document.getElementById('closeMissingIngredientsModal').addEventListener('click', closeMissingIngredientsModal);
-        document.getElementById('closeMissingIngredientsBtn').addEventListener('click', closeMissingIngredientsModal);
-        
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                closeMissingIngredientsModal();
+    }
+    
+    // ✅ ALWAYS attach event listeners (outside the if block so they work every time modal is shown)
+    const closeBtn = document.getElementById('closeMissingIngredientsBtn');
+    const closeModalBtn = document.getElementById('closeMissingIngredientsModal');
+    const goToInventoryBtn = document.getElementById('goToInventoryBtn');
+    
+    // Remove old listeners by cloning and replacing
+    if (closeBtn) {
+        const newCloseBtn = closeBtn.cloneNode(true);
+        closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+        newCloseBtn.addEventListener('click', function(e) {
+            console.log('✓ Understood button clicked');
+            e.preventDefault();
+            e.stopPropagation();
+            closeMissingIngredientsModal();
+        });
+    }
+    
+    if (closeModalBtn) {
+        const newCloseModalBtn = closeModalBtn.cloneNode(true);
+        closeModalBtn.parentNode.replaceChild(newCloseModalBtn, closeModalBtn);
+        newCloseModalBtn.addEventListener('click', function(e) {
+            console.log('✕ Close modal button clicked');
+            e.preventDefault();
+            e.stopPropagation();
+            closeMissingIngredientsModal();
+        });
+    }
+    
+    if (goToInventoryBtn) {
+        const newGoToInventoryBtn = goToInventoryBtn.cloneNode(true);
+        goToInventoryBtn.parentNode.replaceChild(newGoToInventoryBtn, goToInventoryBtn);
+        newGoToInventoryBtn.addEventListener('click', function(e) {
+            console.log('📦 Go to Inventory button clicked');
+            e.preventDefault();
+            e.stopPropagation();
+            closeMissingIngredientsModal();
+            showToast('📦 Navigate to Inventory Management to restock ingredients', 'info', 3000);
+            // Navigate to inventory section
+            if (typeof showSection === 'function') {
+                showSection('inventory');
             }
         });
     }
+    
+    // Handle modal background click
+    modal.onclick = function(e) {
+        if (e.target === modal) {
+            closeMissingIngredientsModal();
+        }
+    };
     
     // Update modal content
     document.getElementById('missingProductName').textContent = productName;
@@ -2203,6 +2262,7 @@ function showMissingIngredientsModal(productName, missingIngredients) {
     });
     
     // Show modal
+    console.log('📋 Showing missing ingredients modal');
     modal.style.display = 'flex';
     setTimeout(() => {
         modal.classList.add('show');

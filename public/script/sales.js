@@ -995,6 +995,11 @@ async function loadSalesReport() {
         
         updateSalesReportDisplay(oldData);
         
+        // Calculate and display revenue breakdown
+        setTimeout(() => {
+            calculateRevenueBreakdown();
+        }, 500);
+        
     } catch (error) {
         console.error('❌ Error loading sales report:', error);
         
@@ -1794,6 +1799,307 @@ function addAnimationStyles() {
     document.head.appendChild(style);
 }
 
+// ==================== REAL-TIME UPDATES VIA EVENT SOURCE ====================
+let salesEventSource = null;
+
+function setupSalesRealTimeUpdates() {
+    try {
+        console.log('🔗 Setting up real-time updates for sales report...');
+        
+        // Close any existing connection
+        if (salesEventSource) {
+            salesEventSource.close();
+            salesEventSource = null;
+        }
+        
+        salesEventSource = new EventSource('/api/admin/events');
+        
+        salesEventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('📨 Real-time event received:', data.type);
+                
+                if (data.type === 'new_order') {
+                    console.log('🆕 New order detected! Refreshing sales report...');
+                    // Reload sales data immediately when new order arrives
+                    loadSalesReport();
+                } else if (data.type === 'stats_update') {
+                    console.log('📊 Stats update detected! Refreshing sales report...');
+                    loadSalesReport();
+                }
+            } catch (error) {
+                console.error('❌ Error parsing real-time event:', error);
+            }
+        };
+        
+        salesEventSource.onerror = (error) => {
+            console.warn('⚠️ Real-time connection error, attempting to reconnect...');
+            
+            if (salesEventSource) {
+                salesEventSource.close();
+                salesEventSource = null;
+            }
+            
+            // Retry connection after 5 seconds
+            setTimeout(() => {
+                console.log('🔄 Reconnecting to real-time updates...');
+                setupSalesRealTimeUpdates();
+            }, 5000);
+        };
+        
+        salesEventSource.onopen = () => {
+            console.log('✅ Real-time connection established for sales report');
+        };
+        
+        window.salesEventSource = salesEventSource;
+        
+    } catch (error) {
+        console.error('❌ Error setting up real-time updates:', error);
+    }
+}
+
+// ==================== 📊 REVENUE BREAKDOWN FUNCTIONS ====================
+
+/**
+ * Maps item names to their category based on keywords
+ * @param {string} itemName - The name of the menu item
+ * @returns {string} - The category of the item
+ */
+function getItemCategory(itemName) {
+    const lowerName = itemName.toLowerCase();
+    
+    // Coffee category
+    if (lowerName.includes('coffee') || lowerName.includes('latte') || 
+        lowerName.includes('espresso') || lowerName.includes('americano') || 
+        lowerName.includes('macchiato')) {
+        return 'Coffee';
+    }
+    
+    // Snacks category
+    if (lowerName.includes('snack') || lowerName.includes('fries') || 
+        lowerName.includes('pancit') || lowerName.includes('bihon') ||
+        lowerName.includes('shanghai') || lowerName.includes('lumpia') ||
+        lowerName.includes('nachos') || lowerName.includes('clubhouse') ||
+        lowerName.includes('sandwich')) {
+        return 'Snacks & Appetizers';
+    }
+    
+    // Rice Bowl Meals category
+    if (lowerName.includes('rice') || lowerName.includes('bowl') || 
+        lowerName.includes('korean') || lowerName.includes('bulgogi') || 
+        lowerName.includes('salt and pepper') || lowerName.includes('lechon') ||
+        lowerName.includes('adobo') || lowerName.includes('cream dory') ||
+        lowerName.includes('buttered')) {
+        return 'Rice Bowl Meals';
+    }
+    
+    // Hot Sizzlers category
+    if (lowerName.includes('sizzling') || lowerName.includes('sisig') || 
+        lowerName.includes('liempo') || lowerName.includes('porkchop')) {
+        return 'Hot Sizzlers';
+    }
+    
+    // Party Platters category
+    if (lowerName.includes('party') || lowerName.includes('canton') ||
+        lowerName.includes('spaghetti') || lowerName.includes('large')) {
+        return 'Party Platters';
+    }
+    
+    // Budget Meals category
+    if (lowerName.includes('budget') || lowerName.includes('tinapa') || 
+        lowerName.includes('tuyo') || lowerName.includes('fried rice') ||
+        lowerName.includes('plain rice')) {
+        return 'Budget Meals';
+    }
+    
+    // Specialty Drinks/Specialties category
+    if (lowerName.includes('bulalo') || lowerName.includes('sinigang') ||
+        lowerName.includes('paknet') || lowerName.includes('pakbet')) {
+        return 'Specialty Dishes';
+    }
+    
+    // Milk Tea category
+    if (lowerName.includes('milk tea') || lowerName.includes('matcha')) {
+        return 'Milk Tea';
+    }
+    
+    // Frappe category
+    if (lowerName.includes('frappe') || lowerName.includes('cookies & cream') ||
+        lowerName.includes('strawberry') || lowerName.includes('mango')) {
+        return 'Frappe';
+    }
+    
+    // Beverages category
+    if (lowerName.includes('beverage') || lowerName.includes('soda') || 
+        lowerName.includes('juice') || lowerName.includes('iced tea') ||
+        lowerName.includes('lemonade') || lowerName.includes('red tea')) {
+        return 'Beverages';
+    }
+    
+    // Default category
+    return 'Other';
+}
+
+/**
+ * Calculates revenue breakdown for the current day (Feb 20, 2026)
+ * @returns {Object} - Revenue breakdown by category
+ */
+async function calculateRevenueBreakdown() {
+    try {
+        console.log('📊 Calculating revenue breakdown for Feb 20, 2026...');
+        
+        // Fetch orders for today
+        const response = await fetch('/api/orders?date=today');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        const orders = Array.isArray(result) ? result : result.data || [];
+        
+        console.log('📦 Total orders fetched:', orders.length);
+        
+        // Initialize breakdown structure
+        const breakdown = {
+            'Coffee': { amount: 0, count: 0 },
+            'Snacks & Appetizers': { amount: 0, count: 0 },
+            'Rice Bowl Meals': { amount: 0, count: 0 },
+            'Hot Sizzlers': { amount: 0, count: 0 },
+            'Party Platters': { amount: 0, count: 0 },
+            'Budget Meals': { amount: 0, count: 0 },
+            'Specialty Dishes': { amount: 0, count: 0 },
+            'Milk Tea': { amount: 0, count: 0 },
+            'Frappe': { amount: 0, count: 0 },
+            'Beverages': { amount: 0, count: 0 },
+            'Other': { amount: 0, count: 0 }
+        };
+        
+        let totalRevenue = 0;
+        
+        // Process each order
+        orders.forEach(order => {
+            // Skip if order is not from today (Feb 20, 2026)
+            if (order.createdAt) {
+                const orderDate = new Date(order.createdAt);
+                const today = new Date('2026-02-20');
+                if (orderDate.toDateString() !== today.toDateString()) {
+                    return; // Skip orders not from today
+                }
+            }
+            
+            // Process items in the order
+            if (order.items && Array.isArray(order.items)) {
+                order.items.forEach(item => {
+                    const itemName = item.name || item.itemName || '';
+                    const itemPrice = parseFloat(item.price) || 0;
+                    const itemQuantity = parseInt(item.quantity) || 1;
+                    const itemTotal = itemPrice * itemQuantity;
+                    
+                    const category = getItemCategory(itemName);
+                    
+                    breakdown[category].amount += itemTotal;
+                    breakdown[category].count += itemQuantity;
+                    totalRevenue += itemTotal;
+                });
+            }
+        });
+        
+        // Calculate percentages
+        const breakdownWithPercentage = {};
+        Object.keys(breakdown).forEach(category => {
+            const percentage = totalRevenue > 0 
+                ? (breakdown[category].amount / totalRevenue * 100) 
+                : 0;
+            
+            breakdownWithPercentage[category] = {
+                amount: breakdown[category].amount,
+                count: breakdown[category].count,
+                percentage: percentage
+            };
+        });
+        
+        console.log('✅ Revenue Breakdown Calculated:', {
+            totalRevenue: totalRevenue,
+            breakdown: breakdownWithPercentage
+        });
+        
+        // Update display
+        updateRevenueBreakdownDisplay(breakdownWithPercentage, totalRevenue);
+        
+        return { breakdown: breakdownWithPercentage, totalRevenue };
+        
+    } catch (error) {
+        console.error('❌ Error calculating revenue breakdown:', error);
+        return { breakdown: {}, totalRevenue: 0 };
+    }
+}
+
+/**
+ * Updates the HTML display with revenue breakdown data
+ * @param {Object} breakdown - Revenue breakdown by category
+ * @param {number} totalRevenue - Total revenue amount
+ */
+function updateRevenueBreakdownDisplay(breakdown, totalRevenue) {
+    try {
+        // Update date display
+        const dateEl = document.getElementById('revenueDate');
+        if (dateEl) {
+            const today = new Date('2026-02-20');
+            dateEl.textContent = today.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric',
+                year: 'numeric'
+            });
+            fadeInElement(dateEl, 100);
+        }
+        
+        // Update total revenue display
+        const totalRevenueEl = document.getElementById('revenueBreakdownTotal');
+        if (totalRevenueEl) {
+            animateValue(totalRevenueEl, 0, totalRevenue, 1000, '₱');
+            fadeInElement(totalRevenueEl, 200);
+        }
+        
+        // Update breakdown table/list
+        const breakdownContainer = document.getElementById('revenueBreakdownContainer');
+        if (breakdownContainer) {
+            let breakdownHTML = '';
+            
+            Object.keys(breakdown)
+                .filter(category => breakdown[category].amount > 0) // Only show categories with revenue
+                .sort((a, b) => breakdown[b].amount - breakdown[a].amount) // Sort by amount descending
+                .forEach((category, index) => {
+                    const data = breakdown[category];
+                    const delay = 300 + (index * 100);
+                    
+                    breakdownHTML += `
+                        <div class="revenue-breakdown-row" style="animation-delay: ${delay}ms;">
+                            <div class="breakdown-category">
+                                <span class="category-name">${category}</span>
+                                <span class="category-count">${data.count} items</span>
+                            </div>
+                            <div class="breakdown-amounts">
+                                <span class="breakdown-amount">₱${data.amount.toFixed(2)}</span>
+                                <span class="breakdown-percentage">${data.percentage.toFixed(1)}%</span>
+                            </div>
+                            <div class="breakdown-bar">
+                                <div class="bar-fill" style="width: ${data.percentage}%;"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+            
+            breakdownContainer.innerHTML = breakdownHTML || '<p>No revenue data available for today.</p>';
+            fadeInElement(breakdownContainer, 250);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error updating revenue breakdown display:', error);
+    }
+}
+
+// ==================== END REVENUE BREAKDOWN FUNCTIONS ====================
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📊 Sales Report page loaded');
@@ -1811,8 +2117,14 @@ document.addEventListener('DOMContentLoaded', function() {
             loadSalesReport();
         }, 500);
         
-        // Refresh every 30 seconds
+        // ✅ Setup real-time updates via EventSource
+        setTimeout(() => {
+            setupSalesRealTimeUpdates();
+        }, 1000);
+        
+        // Refresh every 30 seconds as fallback
         setInterval(() => {
+            console.log('🔄 Periodic refresh of sales report (30s interval)');
             loadSalesReport();
         }, 30000);
         
@@ -1824,8 +2136,19 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (salesEventSource) {
+            salesEventSource.close();
+            salesEventSource = null;
+        }
+    });
 });
 
 // Make functions available globally
 window.exportSalesReport = exportSalesReport;
 window.showNotification = showNotification;
+window.calculateRevenueBreakdown = calculateRevenueBreakdown;
+window.updateRevenueBreakdownDisplay = updateRevenueBreakdownDisplay;
+window.getItemCategory = getItemCategory;

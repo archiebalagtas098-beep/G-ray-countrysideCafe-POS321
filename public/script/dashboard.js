@@ -317,12 +317,22 @@ async function loadTodayOrders() {
 // Load top selling items
 async function loadTopSellingItems() {
     try {
-        if (dashboardData.stats.topSellingProducts && dashboardData.stats.topSellingProducts.length > 0) {
-            dashboardData.topSelling = dashboardData.stats.topSellingProducts
+        console.log('📊 Loading top selling items directly from API...');
+        
+        // ✅ ALWAYS fetch directly from API for real-time data
+        const response = await fetch('/api/orders/top-items', {
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('✅ Top Selling Items API response:', result);
+            
+            // Map ALL products from the API response, don't limit to 5 here
+            dashboardData.topSelling = (result.data || result.items || [])
                 .filter(item => item._id && item._id !== 'Unknown' && item._id !== 'Unknown Item')
                 .map(item => {
-                    // Handle both string _id and object _id from $ifNull aggregation
-                    const itemId = typeof item._id === 'string' ? item._id : item._id || item.name;
+                    const itemId = typeof item._id === 'string' ? item._id : item._id || item.name || 'Unknown';
                     return {
                         _id: itemId,
                         name: itemId,
@@ -330,31 +340,23 @@ async function loadTopSellingItems() {
                         revenue: item.totalRevenue || item.revenue || 0
                     };
                 });
-        } else {
-            const response = await fetch('/api/orders/top-items?limit=5', {
-                credentials: 'include'
-            });
             
-            if (response.ok) {
-                const result = await response.json();
-                dashboardData.topSelling = (result.data || result.items || [])
-                    .filter(item => item._id && item._id !== 'Unknown' && item._id !== 'Unknown Item')
-                    .map(item => {
-                        // Handle both string _id and object _id from $ifNull aggregation
-                        const itemId = typeof item._id === 'string' ? item._id : item._id || item.name || 'Unknown';
-                        return {
-                            _id: itemId,
-                            name: itemId,
-                            quantity: item.totalQuantity || item.quantity || 0,
-                            revenue: item.totalRevenue || item.revenue || 0
-                        };
-                    });
-            } else {
-                dashboardData.topSelling = [];
+            console.log(`✅ Top Selling Items loaded: ${dashboardData.topSelling.length} items`);
+            
+            // Log details for debugging
+            if (dashboardData.topSelling.length > 0) {
+                console.log('📋 Top items sample:', dashboardData.topSelling.slice(0, 3).map(i => ({
+                    name: i.name,
+                    revenue: i.revenue,
+                    quantity: i.quantity
+                })));
             }
+        } else {
+            console.warn('⚠️ Top Selling Items API failed with status:', response.status);
+            dashboardData.topSelling = [];
         }
     } catch (error) {
-        console.error('Error loading top selling items:', error);
+        console.error('❌ Error loading top selling items:', error);
         dashboardData.topSelling = [];
     }
 }
@@ -819,6 +821,8 @@ function updateOrdersTable() {
 function updateTopSellingTable() {
     if (!topItemsTableBody) return;
     
+    console.log('🔄 Updating top selling items table with', (dashboardData.topSelling || []).length, 'items');
+    
     topItemsTableBody.innerHTML = '';
     
     const topSellingData = dashboardData.topSelling || [];
@@ -829,13 +833,21 @@ function updateTopSellingTable() {
                 <td colspan="3" class="no-data">No sales data available</td>
             </tr>
         `;
+        console.warn('⚠️ No top selling data to display');
         return;
     }
     
+    // ✅ Display ALL items from topSellingData, but only show first 5 in table
     const displayItems = topSellingData.slice(0, 5);
+    
+    console.log(`📊 Displaying ${displayItems.length} items in top selling table`);
     
     displayItems.forEach((item, index) => {
         const row = document.createElement('tr');
+        row.className = 'top-item-row-animated';
+        row.style.opacity = '0';
+        row.style.transform = 'translateY(10px)';
+        row.style.transition = `opacity 0.3s ease ${index * 100}ms, transform 0.3s ease ${index * 100}ms`;
         
         let status = 'Good';
         let statusClass = 'status-instock';
@@ -864,7 +876,17 @@ function updateTopSellingTable() {
         `;
         
         topItemsTableBody.appendChild(row);
+        
+        // ✅ Trigger animation
+        setTimeout(() => {
+            row.style.opacity = '1';
+            row.style.transform = 'translateY(0)';
+        }, 10);
+        
+        console.log(`  ✅ Item ${index + 1}: ${displayName} - ₱${revenue.toFixed(2)}`);
     });
+    
+    console.log('✅ Top selling table updated successfully');
 }
 
 // Set up event listeners
@@ -1100,18 +1122,36 @@ function handleRealTimeEvent(event) {
 
 // Handle new order event
 function handleNewOrder(orderData) {
+    console.log('🆕 New order received, refreshing dashboard data...', orderData);
+    
     showNewOrderNotification(orderData);
     
     setTimeout(async () => {
         try {
+            // ✅ Load all data including top selling items
+            console.log('⏳ Loading stats...');
             await loadStats();
+            
+            console.log('⏳ Loading orders...');
             await loadTodayOrders();
+            
+            console.log('⏳ Loading top selling items...');
             await loadTopSellingItems();
+            
+            // ✅ Update all UI elements
+            console.log('🔄 Updating all dashboard tables...');
             updateStatsCards();
             updateOrdersTable();
             updateTopSellingTable();
+            
+            console.log('✅ Dashboard updated successfully after new order');
+            
+            // ✅ Show confirmation toast
+            showNotification('📊 Dashboard data updated with new order!', 'success');
+            
         } catch (error) {
-            console.error('Error updating after new order:', error);
+            console.error('❌ Error updating after new order:', error);
+            showNotification('⚠️ Failed to update some dashboard data', 'error');
         }
     }, 1000);
 }
