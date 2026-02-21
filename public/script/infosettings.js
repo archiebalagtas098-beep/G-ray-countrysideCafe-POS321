@@ -239,19 +239,20 @@ async function loadUserDataWithRetry(maxRetries) {
 async function loadUserData() {
   try {
     console.log('Attempting to load user data...');
-    console.log('Current user token status:', document.cookie);
+    console.log('Current user token status: Token present');
     
-    // Try multiple endpoints including the new one
+    // Try endpoints in order (prefer specific endpoint first)
     const endpoints = [
-      '/api/infosettings/user',  // New endpoint
+      '/api/infosettings/user',  // Primary endpoint
+      '/api/user/profile',       // Secondary endpoint
+      '/api/user',               // Fallback endpoint
       '/api/user/data',          // Alternative endpoint
-      '/api/user/profile',       // Another alternative
-      '/api/user',               // Basic endpoint
-      '/api/auth/user'           // Auth endpoint
+      '/api/auth/user'           // Last resort
     ];
     
     let response = null;
     let successfulEndpoint = null;
+    let lastError = null;
     
     // Try each endpoint until one works
     for (const endpoint of endpoints) {
@@ -267,37 +268,65 @@ async function loadUserData() {
           cache: 'no-cache'
         });
         
-        console.log(`Response status for ${endpoint}:`, response.status, response.statusText);
+        console.log(`Response status for ${endpoint}: ${response.status} ${response.statusText}`);
         
         if (response.ok) {
           successfulEndpoint = endpoint;
-          console.log(`✅ Success with endpoint: ${endpoint}`);
+          console.log(`✅ Endpoint ${endpoint} returned OK status`);
           break;
         } else {
-          const errorText = await response.text();
-          console.warn(`❌ Endpoint ${endpoint} returned status ${response.status}:`, errorText);
+          // Try to get error text
+          let errorText = '';
+          try {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const jsonError = await response.json();
+              errorText = JSON.stringify(jsonError);
+            } else {
+              errorText = await response.text();
+            }
+          } catch (e) {
+            errorText = `Status ${response.status}`;
+          }
+          
+          console.warn(`⚠️ Endpoint ${endpoint} returned status ${response.status}`);
+          lastError = { endpoint, status: response.status, text: errorText };
         }
-      } catch (error) {
-        console.warn(`Endpoint ${endpoint} failed with error:`, error.message);
+      } catch (fetchError) {
+        console.warn(`❌ Endpoint ${endpoint} failed:`, fetchError.message);
+        lastError = { endpoint, error: fetchError.message };
         continue;
       }
     }
     
     if (!response || !response.ok) {
-      throw new Error(`No valid API endpoint found. Status: ${response ? response.status : 'No response'}`);
+      const errorMsg = lastError 
+        ? `All endpoints failed. Last error: ${lastError.endpoint} (${lastError.status || lastError.error})`
+        : 'No valid API endpoint found';
+      
+      console.error('❌ ' + errorMsg);
+      throw new Error(errorMsg);
     }
 
+    console.log(`✅ Successfully got response from: ${successfulEndpoint}`);
+    
     const result = await response.json();
-    console.log('✅ User data loaded:', result);
+    console.log('Response data:', result);
     
     // Handle different response structures
     let userData;
     if (result.data) {
-      userData = result.data; // For /api/infosettings/user
+      userData = result.data; // For /api/infosettings/user and similar endpoints
     } else if (Array.isArray(result)) {
-      userData = result[0]; // For /api/user
+      userData = result[0]; // For array responses
     } else {
-      userData = result; // For /api/user/data
+      userData = result; // Direct response
+    }
+    
+    console.log('Extracted user data:', userData);
+    
+    if (!userData || !userData.username) {
+      throw new Error('Invalid user data structure');
     }
     
     // Map database fields to form fields
@@ -313,6 +342,8 @@ async function loadUserData() {
       updatedAt: userData.updatedAt || new Date().toISOString()
     };
     
+    console.log('✅ Current user object created:', currentUser);
+    
     originalUserData = JSON.parse(JSON.stringify(currentUser));
     
     // Update UI with fresh data
@@ -326,11 +357,8 @@ async function loadUserData() {
       elements.lastSavedTime.style.display = 'block';
     }
     
-    // Show success message briefly
-    showToast('User data loaded successfully', 'success');
-    
   } catch (error) {
-    console.error('Error loading user data:', error);
+    console.error('❌ Error loading user data:', error.message);
     throw error;
   }
 }
@@ -436,6 +464,34 @@ async function handlePersonalInfoChange() {
     
     // Update last saved time
     updateLastSavedTime();
+    
+    // Send email notification after successful profile update
+    try {
+      console.log('📧 Sending profile update notification...');
+      const notifyResponse = await fetch('/api/notify/profile-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: currentUser.email,
+          fullName: currentUser.fullName,
+          phone: currentUser.phoneNumber
+        })
+      });
+
+      if (notifyResponse.ok) {
+        const notifyResult = await notifyResponse.json();
+        if (notifyResult.emailSent) {
+          console.log('✅ Profile update email sent to', currentUser.email);
+        }
+        if (notifyResult.smsSent) {
+          console.log('✅ Profile update SMS sent to', currentUser.phoneNumber);
+        }
+      }
+    } catch (notifyError) {
+      console.warn('⚠️ Notification sending failed (non-critical):', notifyError);
+      // Don't block the main flow if notifications fail
+    }
     
   } catch (error) {
     console.error('Error saving changes:', error);
@@ -579,6 +635,34 @@ async function handlePasswordChange(e) {
         elements.currentPassword.value = '';
         elements.newPassword.value = '';
         elements.confirmPassword.value = '';
+        
+        // Send password change notification email and SMS
+        try {
+          console.log('📧 Sending password change notification...');
+          const notifyResponse = await fetch('/api/notify/password-change', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              email: currentUser.email,
+              fullName: currentUser.fullName,
+              phone: currentUser.phoneNumber
+            })
+          });
+
+          if (notifyResponse.ok) {
+            const notifyResult = await notifyResponse.json();
+            if (notifyResult.emailSent) {
+              console.log('✅ Password change email sent to', currentUser.email);
+            }
+            if (notifyResult.smsSent) {
+              console.log('✅ Password change SMS sent to', currentUser.phoneNumber);
+            }
+          }
+        } catch (notifyError) {
+          console.warn('⚠️ Notification sending failed (non-critical):', notifyError);
+          // Don't block the main flow if notifications fail
+        }
         
         // Show success message for 2 seconds before hiding form
         setTimeout(() => {

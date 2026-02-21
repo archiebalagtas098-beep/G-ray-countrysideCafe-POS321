@@ -712,10 +712,6 @@ function handleStockRequest(data) {
     
     // Also save to localStorage for cross-page communication
     saveStockRequestToLocalStorage(requestNotification);
-    
-    // Show toast but also update dashboard
-    showToast(`📦 New stock request: ${quantity} ${unit} of ${productName}`, 'info', 8000);
-    
     // Refresh dashboard to show the request
     if (currentSection === 'dashboard') {
         renderDashboardGrid();
@@ -893,7 +889,6 @@ function listenForStockRequests() {
         }
     }, 2000);
     
-    console.log('✅ Stock request listener initialized');
 }
 
 // ==================== LOAD PENDING STOCK REQUESTS ====================
@@ -981,10 +976,7 @@ async function fulfillStockRequest(requestIndex) {
         }
         
         const fulfillResult = await fulfillResponse.json();
-        console.log(`✅ Stock request fulfilled:`, fulfillResult);
-        
-        showToast(`✅ Stock request for ${request.productName} marked as fulfilled!`, 'success', 3000);
-        
+
         // Refresh the dashboard to remove the fulfilled request
         await renderDashboardGrid();
         
@@ -1037,7 +1029,6 @@ function updateStockRequestBadgeFromStaff(staffCount) {
     
     const badge = document.getElementById('notificationBadge');
     if (!badge) {
-        console.warn('⚠️ Badge element not found! Creating one...');
         // Try to find or create the badge
         const notificationBtn = document.querySelector('.notification-icon');
         if (notificationBtn && !notificationBtn.querySelector('#notificationBadge')) {
@@ -1772,6 +1763,31 @@ function renderNotifications() {
             `;
         }
         
+        // Determine button text and style based on item type
+        let buttonHtml = '';
+        if (item.type === 'stock_request') {
+            buttonHtml = `<button class="notification-done" onclick="dismissNotification('${item.id}')" style="
+                background: #4caf50;
+                border: none;
+                color: white;
+                padding: 6px 16px;
+                border-radius: 4px;
+                font-size: 11px;
+                cursor: pointer;
+                font-weight: 600;
+            ">Done</button>`;
+        } else {
+            buttonHtml = `<button class="notification-dismiss" onclick="dismissNotification('${item.id}')" style="
+                background: none;
+                border: 1px solid #6c757d;
+                color: #6c757d;
+                padding: 2px 8px;
+                border-radius: 4px;
+                font-size: 11px;
+                cursor: pointer;
+            ">Dismiss</button>`;
+        }
+
         notificationItem.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
                 <div style="font-weight: 600; color: #333; font-size: 14px; display: flex; align-items: center; gap: 8px;">
@@ -1788,15 +1804,7 @@ function renderNotifications() {
                 <div style="color: #999; font-size: 11px;">
                     <i class="far fa-clock"></i> ${timeDisplay}
                 </div>
-                <button class="notification-dismiss" onclick="dismissNotification('${item.id}')" style="
-                    background: none;
-                    border: 1px solid #6c757d;
-                    color: #6c757d;
-                    padding: 2px 8px;
-                    border-radius: 4px;
-                    font-size: 11px;
-                    cursor: pointer;
-                ">Dismiss</button>
+                ${buttonHtml}
             </div>
         `;
         
@@ -3258,6 +3266,22 @@ async function renderDashboardGrid() {
                             <span class="label">Quantity requested:</span>
                             <span style="font-size: 18px; font-weight: bold; color: #2196f3;">${quantity} ${unit}</span>
                         </div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: flex-end; margin-top: 15px;">
+                        <button onclick="fulfillStockRequest(${index})" style="
+                            background: #4caf50;
+                            border: none;
+                            color: white;
+                            padding: 10px 24px;
+                            border-radius: 4px;
+                            font-size: 14px;
+                            cursor: pointer;
+                            font-weight: 600;
+                            transition: all 0.3s ease;
+                        " onmouseover="this.style.background='#45a049'" onmouseout="this.style.background='#4caf50'">
+                            ✓ Done
+                        </button>
                     </div>
                     </div>
                 </div>

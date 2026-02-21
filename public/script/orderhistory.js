@@ -3,19 +3,10 @@
 // Check if this is the order history page to avoid conflicts
 if (window.location.pathname.includes('orderhistory')) {
     
-    let orderHistoryAllOrders = [];
-    let orderHistoryFilteredOrders = [];
-    let orderHistoryCurrentPage = 1;
-    const orderHistoryItemsPerPage = 10;
-
-    // DOM Elements
-    const ordersTable = document.getElementById('ordersTable');
-    const ordersTableBody = document.getElementById('ordersTableBody');
-    const noOrdersMessage = document.getElementById('noOrdersMessage');
-    const pagination = document.getElementById('pagination');
-    const topItemsBody = document.getElementById('topItemsBody');
-    const inventoryStatusBody = document.getElementById('inventoryStatusBody');
-    const todaysOrdersBody = document.getElementById('todaysOrdersBody');
+    // DOM Elements - Get them dynamically
+    let topItemsBody = document.getElementById('topItemsBody');
+    let inventoryStatusBody = document.getElementById('inventoryStatusBody');
+    let todaysOrdersBody = document.getElementById('todaysOrdersBody');
 
     // Load orders on page load
     document.addEventListener('DOMContentLoaded', function() {
@@ -24,34 +15,40 @@ if (window.location.pathname.includes('orderhistory')) {
         const isOrderHistoryPage = window.location.pathname.includes('orderhistory');
         
         if (isOrderHistoryPage) {
-            console.log('🏁 Loading orders...');
+            console.log('🏁 Loading data from database...');
             
-            // Only load if elements exist
-            if (ordersTableBody && noOrdersMessage) {
-                // Load initial data
-                loadOrders();
+            // Re-get elements to ensure they exist
+            topItemsBody = document.getElementById('topItemsBody');
+            inventoryStatusBody = document.getElementById('inventoryStatusBody');
+            todaysOrdersBody = document.getElementById('todaysOrdersBody');
+            
+            // Load initial data
+            if (topItemsBody || inventoryStatusBody || todaysOrdersBody) {
+                console.log('📊 Loading Top Items, Inventory, and Today\'s Orders...');
+                loadInventoryStatus();
+                loadLowStockItems();
+                loadTopItems();
+                loadTodaysOrders();
+            }
+            
+            // Setup real-time updates
+            setupRealTimeUpdates();
+            
+            // Refresh every 30 seconds
+            setInterval(() => {
+                console.log('🔄 Refreshing data from database...');
                 
-                if (inventoryStatusBody || topItemsBody || todaysOrdersBody) {
+                topItemsBody = document.getElementById('topItemsBody');
+                inventoryStatusBody = document.getElementById('inventoryStatusBody');
+                todaysOrdersBody = document.getElementById('todaysOrdersBody');
+                
+                if (topItemsBody || inventoryStatusBody || todaysOrdersBody) {
                     loadInventoryStatus();
+                    loadLowStockItems();
                     loadTopItems();
                     loadTodaysOrders();
                 }
-                
-                // Setup real-time updates for orders and top items
-                setupRealTimeUpdates();
-                
-                // Refresh every 30 seconds
-                setInterval(() => {
-                    console.log('🔄 Refreshing orders...');
-                    loadOrders();
-                    
-                    if (inventoryStatusBody || topItemsBody || todaysOrdersBody) {
-                        loadInventoryStatus();
-                        loadTopItems();
-                        loadTodaysOrders();
-                    }
-                }, 30000);
-            }
+            }, 30000);
         }
     });
 
@@ -200,20 +197,6 @@ if (window.location.pathname.includes('orderhistory')) {
             const isPaid = order.payment?.status === 'completed';
             
             const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${order.orderNumber || 'N/A'}</td>
-                <td>${order.customerName || 'Walk-in'}</td>
-                <td>${itemsList}</td>
-                <td>₱${(order.total || 0).toFixed(2)}</td>
-                <td><span class="status-badge ${statusClass}">${order.status}</span></td>
-                <td>${dateTime}</td>
-                <td>${order.payment?.method || 'Cash'}</td>
-                <td>
-                    <button class="btn-view" onclick="viewOrderDetails('${order._id}')">View</button>
-                    ${!isPaid ? `<button class="btn-pay" onclick="openPaymentModal('${order._id}', '${order.orderNumber}', ${order.total})">Pay</button>` : '<span class="status-badge status-completed">Paid</span>'}
-                    <button class="btn-receipt" onclick="printReceipt('${order._id}')">Receipt</button>
-                </td>
-            `;
             ordersTableBody.appendChild(row);
         });
         
@@ -325,18 +308,37 @@ if (window.location.pathname.includes('orderhistory')) {
 
     async function loadInventoryStatus() {
         try {
-            if (!inventoryStatusBody) return;
+            // Always re-fetch the element reference
+            const body = document.getElementById('inventoryStatusBody');
+            if (!body) {
+                console.warn('⚠️ inventoryStatusBody element not found in DOM');
+                return;
+            }
             
-            const response = await fetch('/api/inventory');
-            if (!response.ok) throw new Error('Failed to load inventory');
+            console.log('📦 Fetching ALL inventory from /api/inventory...');
+            const response = await fetch('/api/inventory', {
+                credentials: 'include',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
+            console.log('📦 Inventory fetch response status:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to load inventory: ${response.status} ${response.statusText}`);
+            }
             
             const result = await response.json();
-            const items = result.success ? result.data : [];
+            console.log('📦 Inventory API response:', result);
             
-            inventoryStatusBody.innerHTML = '';
+            const items = result.data || result.items || [];
+            
+            console.log('📦 ALL inventory items fetched:', items.length);
+            body.innerHTML = '';
             
             if (items.length === 0) {
-                inventoryStatusBody.innerHTML = `
+                body.innerHTML = `
                     <tr>
                         <td colspan="3" style="text-align: center; color: #999; padding: 20px;">
                             No inventory items found
@@ -346,39 +348,136 @@ if (window.location.pathname.includes('orderhistory')) {
                 return;
             }
             
-            // Sort by stock level (lowest first - out of stock items first)
-            items.sort((a, b) => a.currentStock - b.currentStock);
+            // Sort by stock level (lowest first)
+            items.sort((a, b) => (a.currentStock || a.stock || 0) - (b.currentStock || b.stock || 0));
             
-            items.slice(0, 5).forEach(item => {
+            // Display ALL inventory items
+            items.forEach(item => {
+                const stock = item.currentStock || item.stock || 0;
                 let status = 'In Stock';
-                let statusClass = 'status-in-stock';
+                let statusClass = 'status-instock';
                 
-                if (item.currentStock === 0) {
+                if (stock === 0) {
                     status = 'Out of Stock';
-                    statusClass = 'status-out-of-stock';
-                } else if (item.currentStock <= 10) {
+                    statusClass = 'status-out';
+                } else if (stock <= 50) {
                     status = 'Low Stock';
-                    statusClass = 'status-low-stock';
+                    statusClass = 'status-low';
                 }
                 
-                // Ensure unit has a default value if not provided
-                const unit = item.unit || item.measurementUnit || 'pieces';
+                const unit = item.unit || item.measurementUnit || 'units';
+                const itemName = item.itemName || item.name || 'Unknown';
                 
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${item.itemName || item.name || 'Unknown'}</td>
-                    <td>${item.currentStock} ${unit}</td>
+                    <td>${itemName}</td>
+                    <td>${stock} ${unit}</td>
                     <td><span class="status-badge ${statusClass}">${status}</span></td>
                 `;
-                inventoryStatusBody.appendChild(row);
+                body.appendChild(row);
             });
+            
+            console.log('✅ ALL inventory status loaded');
         } catch (error) {
-            console.error('Error loading inventory:', error);
-            if (inventoryStatusBody) {
-                inventoryStatusBody.innerHTML = `
+            console.error('❌ Error loading inventory:', error);
+            const body = document.getElementById('inventoryStatusBody');
+            if (body) {
+                body.innerHTML = `
                     <tr>
                         <td colspan="3" style="text-align: center; color: #f44336; padding: 20px;">
-                            Failed to load inventory data
+                            Error loading inventory: ${error.message}
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+    }
+
+    async function loadLowStockItems() {
+        try {
+            // Always re-fetch the element reference
+            const body = document.getElementById('lowStockItemsBody');
+            if (!body) {
+                return;
+            }
+            
+            console.log('📦 Fetching LOW STOCK items from /api/inventory...');
+            const response = await fetch('/api/inventory', {
+                credentials: 'include',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
+            console.log('📦 Low stock fetch response status:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to load inventory: ${response.status} ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            console.log('📦 Inventory API response for low stock:', result);
+            
+            const items = result.data || result.items || [];
+            
+            // Filter for low stock (<=50) and out of stock (0) items ONLY
+            const lowStockItems = items.filter(item => {
+                const stock = item.currentStock || item.stock || 0;
+                return stock === 0 || stock <= 50;
+            });
+            
+            console.log('📊 Low/Out of stock items:', lowStockItems.length);
+            body.innerHTML = '';
+            
+            if (lowStockItems.length === 0) {
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="3" style="text-align: center; color: #999; padding: 20px;">
+                            All items are in good stock
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            // Sort by stock level (lowest first - out of stock items first)
+            lowStockItems.sort((a, b) => (a.currentStock || a.stock || 0) - (b.currentStock || b.stock || 0));
+            
+            // Display only low stock items
+            lowStockItems.forEach(item => {
+                const stock = item.currentStock || item.stock || 0;
+                let status = 'In Stock';
+                let statusClass = 'status-instock';
+                
+                if (stock === 0) {
+                    status = 'Out of Stock';
+                    statusClass = 'status-out';
+                } else if (stock <= 50) {
+                    status = 'Low Stock';
+                    statusClass = 'status-low';
+                }
+                
+                const unit = item.unit || item.measurementUnit || 'units';
+                const itemName = item.itemName || item.name || 'Unknown';
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${itemName}</td>
+                    <td>${stock} ${unit}</td>
+                    <td><span class="status-badge ${statusClass}">${status}</span></td>
+                `;
+                body.appendChild(row);
+            });
+            
+            console.log('✅ Low stock items loaded');
+        } catch (error) {
+            console.error('❌ Error loading low stock items:', error);
+            const body = document.getElementById('lowStockItemsBody');
+            if (body) {
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="3" style="text-align: center; color: #f44336; padding: 20px;">
+                            Error loading low stock items: ${error.message}
                         </td>
                     </tr>
                 `;
@@ -388,16 +487,20 @@ if (window.location.pathname.includes('orderhistory')) {
 
     async function loadTopItems() {
         try {
-            console.log('📊 Loading top items directly from API...');
-            
-            if (!topItemsBody) {
-                console.warn('⚠️ topItemsBody element not found');
+            // Always re-fetch the element reference
+            const body = document.getElementById('topItemsBody');
+            if (!body) {
+                console.warn('⚠️ topItemsBody element not found in DOM');
                 return;
             }
             
-            // ✅ ALWAYS fetch directly from the dedicated top-items endpoint
+            console.log('📊 Fetching top items from /api/orders/top-items...');
+            
             const response = await fetch('/api/orders/top-items', {
-                credentials: 'include'
+                credentials: 'include',
+                headers: {
+                    'Accept': 'application/json'
+                }
             });
             
             if (!response.ok) {
@@ -407,7 +510,7 @@ if (window.location.pathname.includes('orderhistory')) {
             const result = await response.json();
             console.log('📦 Top Items API response:', result);
             
-            topItemsBody.innerHTML = '';
+            body.innerHTML = '';
             
             // Get top products from API response - supports multiple response formats
             let topProducts = result.data || result.items || result.topItems || [];
@@ -415,7 +518,7 @@ if (window.location.pathname.includes('orderhistory')) {
             console.log(`✅ Found ${topProducts.length} top products from API`);
             
             if (topProducts.length > 0) {
-                console.log('📋 Displaying top products from database:', topProducts.length);
+                console.log('📋 Processing top products from database...');
                 
                 // Filter out items with invalid names
                 const validProducts = topProducts.filter(product => {
@@ -424,7 +527,11 @@ if (window.location.pathname.includes('orderhistory')) {
                     return name && name.trim() !== '' && name !== 'Unknown' && !/^[a-f0-9]{24}$/.test(name);
                 }).slice(0, 5);
                 
-                console.log(`✅ Valid products after filtering: ${validProducts.length}`, validProducts);
+                console.log(`✅ Valid products after filtering: ${validProducts.length}`);
+                
+                if (validProducts.length === 0) {
+                    throw new Error('No valid products found after filtering');
+                }
                 
                 validProducts.forEach((product, index) => {
                     const row = document.createElement('tr');
@@ -507,9 +614,9 @@ if (window.location.pathname.includes('orderhistory')) {
                         <td class="revenue-cell">${formattedRevenue}</td>
                         <td><span class="status-badge ${statusClass}">${status}</span></td>
                     `;
-                    topItemsBody.appendChild(row);
+                    body.appendChild(row);
                     
-                    // ✅ Trigger animation
+                    // Trigger animation
                     setTimeout(() => {
                         row.style.opacity = '1';
                         row.style.transform = 'translateY(0)';
@@ -519,7 +626,7 @@ if (window.location.pathname.includes('orderhistory')) {
                 });
                 
             } else {
-                topItemsBody.innerHTML = `
+                body.innerHTML = `
                     <tr>
                         <td colspan="3" style="text-align: center; color: #999; padding: 30px;">
                             <div style="margin-bottom: 10px;">
@@ -538,8 +645,9 @@ if (window.location.pathname.includes('orderhistory')) {
             
         } catch (error) {
             console.error('❌ Error loading top items:', error);
-            if (topItemsBody) {
-                topItemsBody.innerHTML = `
+            const body = document.getElementById('topItemsBody');
+            if (body) {
+                body.innerHTML = `
                     <tr>
                         <td colspan="3" style="text-align: center; color: #f44336; padding: 20px;">
                             <div style="margin-bottom: 10px;">
@@ -559,16 +667,32 @@ if (window.location.pathname.includes('orderhistory')) {
     // Load today's orders separately
     async function loadTodaysOrders() {
         try {
-            if (!todaysOrdersBody) return;
+            // Always re-fetch the element reference
+            const body = document.getElementById('todaysOrdersBody');
+            if (!body) {
+                console.warn('⚠️ todaysOrdersBody element not found in DOM');
+                return;
+            }
+            
+            console.log('📅 Fetching today\'s orders from /api/orders/today...');
             
             // Fetch today's orders from API
-            const response = await fetch('/api/orders/today?limit=5');
-            if (!response.ok) throw new Error('Failed to load today\'s orders');
+            const response = await fetch('/api/orders/today?limit=5', {
+                credentials: 'include',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to load today's orders: ${response.status}`);
+            }
             
             const result = await response.json();
             const todayOrders = result.success ? result.data : [];
             
-            todaysOrdersBody.innerHTML = '';
+            console.log('📅 Today\'s orders fetched:', todayOrders.length);
+            body.innerHTML = '';
             
             if (todayOrders.length > 0) {
                 todayOrders.slice(0, 5).forEach(order => {
@@ -584,10 +708,10 @@ if (window.location.pathname.includes('orderhistory')) {
                         <td>${order.customerName || 'Walk-in'}</td>
                         <td>₱${(order.total || 0).toFixed(2)}</td>
                     `;
-                    todaysOrdersBody.appendChild(row);
+                    body.appendChild(row);
                 });
             } else {
-                todaysOrdersBody.innerHTML = `
+                body.innerHTML = `
                     <tr>
                         <td colspan="4" style="text-align: center; color: #999; padding: 20px;">
                             No orders today
@@ -595,13 +719,16 @@ if (window.location.pathname.includes('orderhistory')) {
                     </tr>
                 `;
             }
+            
+            console.log('✅ Today\'s orders table updated');
         } catch (error) {
-            console.error('Error loading today\'s orders:', error);
-            if (todaysOrdersBody) {
-                todaysOrdersBody.innerHTML = `
+            console.error('❌ Error loading today\'s orders:', error);
+            const body = document.getElementById('todaysOrdersBody');
+            if (body) {
+                body.innerHTML = `
                     <tr>
                         <td colspan="4" style="text-align: center; color: #f44336; padding: 20px;">
-                            Failed to load today's orders
+                            Error loading today's orders: ${error.message}
                         </td>
                     </tr>
                 `;
@@ -614,43 +741,7 @@ if (window.location.pathname.includes('orderhistory')) {
         const modal = document.createElement('div');
         modal.id = 'paymentModal';
         modal.className = 'payment-modal';
-        modal.innerHTML = `
-            <div class="payment-modal-content">
-                <div class="modal-header">
-                    <h2>Process Payment</h2>
-                    <button class="close-btn" onclick="closePaymentModal()">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="payment-details">
-                        <p><strong>Order Number:</strong> ${orderNumber}</p>
-                        <p><strong>Total Amount:</strong> <span class="amount">₱${totalAmount.toFixed(2)}</span></p>
-                    </div>
-                    <form id="paymentForm">
-                        <div class="form-group">
-                            <label>Payment Method:</label>
-                            <select id="paymentMethod" required>
-                                <option value="cash">Cash</option>
-                                <option value="gcash">GCash</option>
-                                <option value="card">Card</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Amount Paid (₱):</label>
-                            <input type="number" id="amountPaid" placeholder="Enter amount" step="0.01" min="0" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Change:</label>
-                            <input type="text" id="changeDisplay" readonly placeholder="₱0.00" class="change-display">
-                        </div>
-                        <div id="paymentError" class="error-message" style="display: none;"></div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn-cancel" onclick="closePaymentModal()">Cancel</button>
-                    <button class="btn-process" onclick="processPayment('${orderId}', ${totalAmount})">Process Payment</button>
-                </div>
-            </div>
-        `;
+        modal.innerHTML = ``;
         
         document.body.appendChild(modal);
         
@@ -735,111 +826,7 @@ if (window.location.pathname.includes('orderhistory')) {
     }
 
     function generateReceipt(receiptData) {
-        const receiptHTML = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Receipt - ${receiptData.orderNumber}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    .receipt { max-width: 400px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; }
-                    .receipt-header { text-align: center; margin-bottom: 20px; }
-                    .receipt-header h1 { margin: 0; font-size: 24px; }
-                    .receipt-header p { margin: 5px 0; color: #666; }
-                    .receipt-items { margin: 20px 0; border-top: 1px dashed #ddd; border-bottom: 1px dashed #ddd; padding: 10px 0; }
-                    .receipt-item { display: flex; justify-content: space-between; margin: 8px 0; }
-                    .receipt-item-name { flex: 1; }
-                    .receipt-item-qty { width: 40px; text-align: center; }
-                    .receipt-item-price { width: 80px; text-align: right; }
-                    .receipt-totals { margin: 20px 0; }
-                    .receipt-total-row { display: flex; justify-content: space-between; margin: 8px 0; }
-                    .receipt-total-amount { font-weight: bold; font-size: 18px; }
-                    .receipt-payment { margin-top: 20px; padding-top: 10px; border-top: 1px dashed #ddd; }
-                    .receipt-payment-row { display: flex; justify-content: space-between; margin: 5px 0; }
-                    .receipt-footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-                    @media print {
-                        body { margin: 0; }
-                        .btn { display: none; }
-                    }
-                    .btn { 
-                        background: #007bff; 
-                        color: white; 
-                        padding: 10px 20px; 
-                        border: none; 
-                        border-radius: 4px; 
-                        cursor: pointer; 
-                        margin: 10px 5px;
-                        width: calc(50% - 10px);
-                    }
-                    .btn:hover { background: #0056b3; }
-                    .btn-container { text-align: center; margin-top: 20px; }
-                </style>
-            </head>
-            <body>
-                <div class="receipt">
-                    <div class="receipt-header">
-                        <h1>RECEIPT</h1>
-                        <p>Order #${receiptData.orderNumber}</p>
-                        <p>${new Date().toLocaleString()}</p>
-                    </div>
-                    
-                    <div class="receipt-items">
-                        <h3>Items:</h3>
-                        ${receiptData.items.map(item => `
-                            <div class="receipt-item">
-                                <div class="receipt-item-name">${item.name}</div>
-                                <div class="receipt-item-qty">x${item.quantity}</div>
-                                <div class="receipt-item-price">₱${(item.price * item.quantity).toFixed(2)}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                    
-                    <div class="receipt-totals">
-                        <div class="receipt-total-row">
-                            <span>Subtotal:</span>
-                            <span>₱${receiptData.subtotal.toFixed(2)}</span>
-                        </div>
-                        ${receiptData.tax > 0 ? `
-                            <div class="receipt-total-row">
-                                <span>Tax:</span>
-                                <span>₱${receiptData.tax.toFixed(2)}</span>
-                            </div>
-                        ` : ''}
-                        <div class="receipt-total-row receipt-total-amount">
-                            <span>Total:</span>
-                            <span>₱${receiptData.total.toFixed(2)}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="receipt-payment">
-                        <h3>Payment:</h3>
-                        <div class="receipt-payment-row">
-                            <span>Method:</span>
-                            <span>${receiptData.paymentMethod.toUpperCase()}</span>
-                        </div>
-                        <div class="receipt-payment-row">
-                            <span>Amount Paid:</span>
-                            <span>₱${receiptData.amountPaid.toFixed(2)}</span>
-                        </div>
-                        <div class="receipt-payment-row receipt-total-amount">
-                            <span>Change:</span>
-                            <span>₱${receiptData.change.toFixed(2)}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="receipt-footer">
-                        <p>Thank you for your purchase!</p>
-                        <p>Gray Countryside Cafe</p>
-                    </div>
-                    
-                    <div class="btn-container">
-                        <button class="btn" onclick="window.print()">Print Receipt</button>
-                        <button class="btn" onclick="window.close()">Close</button>
-                    </div>
-                </div>
-            </body>
-            </html>
-        `;
+        const receiptHTML = ``;
         
         // Open receipt in new window
         const receiptWindow = window.open('', 'Receipt', 'width=600,height=800');
@@ -867,18 +854,8 @@ if (window.location.pathname.includes('orderhistory')) {
     }
 
     // Expose functions to global scope for inline onclick handlers
-    window.openPaymentModal = openPaymentModal;
-    window.closePaymentModal = closePaymentModal;
-    window.processPayment = processPayment;
-    window.generateReceipt = generateReceipt;
-    window.printReceipt = printReceipt;
-    window.loadOrders = loadOrders;
-    window.displayOrders = displayOrders;
-    window.changePage = changePage;
-    window.searchOrders = searchOrders;
-    window.filterOrders = filterOrders;
-    window.filterByDate = filterByDate;
-    window.refreshOrders = refreshOrders;
-    window.viewOrderDetails = viewOrderDetails;
+    window.loadInventoryStatus = loadInventoryStatus;
+    window.loadTopItems = loadTopItems;
+    window.loadTodaysOrders = loadTodaysOrders;
 
 } // End of order history page check

@@ -314,7 +314,7 @@ const recipeMapping = {
         'Special Bulalo',
         'Paknet (Pakbet w/ Bagnet)'
     ],
-    'Carrots': [
+    'Carrot': [
         'Special Bulalo',
         'Paknet (Pakbet w/ Bagnet)',
         'Pancit Bihon',
@@ -1126,9 +1126,6 @@ function renderDashboardGrid() {
         const isLowStock = currentStock > 0 && currentStock <= minStock;
         const percentage = maxStock > 0 ? Math.min(100, (currentStock / maxStock) * 100) : 0;
         
-        // Get recipe usage info
-        const recipeInfo = getRecipeUsageInfo(item.itemName);
-        
         return `
             <div class="dashboard-card ${isOutOfStock ? 'out-of-stock' : isLowStock ? 'low-stock' : 'in-stock'}">
                 <div class="card-header">
@@ -1157,20 +1154,11 @@ function renderDashboardGrid() {
                                 ${isOutOfStock ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'In Stock'}
                             </span>
                         </div>
-                        <div class="detail">
-                            <span class="label">Dishes:</span>
-                            <span class="value">
-                                <span class="text-success">${recipeInfo.usedInCount} can be made</span>
-                                ${recipeInfo.notUsedInCount > 0 ? 
-                                    `<span class="text-danger"> (${recipeInfo.notUsedInCount} cannot)</span>` : 
-                                    ''}
-                            </span>
-                        </div>
                     </div>
                 </div>
                 <div class="card-footer">
                     <button class="btn btn-sm btn-primary" onclick="openEditModal('${item._id || item.id}')">
-                        ✏️ Edit Item
+                        Edit Raw Ingredients
                     </button>
                 </div>
             </div>
@@ -1178,7 +1166,7 @@ function renderDashboardGrid() {
     }).join('');
 }
 
-// ==================== UPDATED INVENTORY GRID WITH EXACT FORMAT ====================
+// ==================== UPDATED INVENTORY GRID WITHOUT DISH COUNTS ====================
 function renderInventoryGrid() {
     if (!elements.inventoryGrid) return;
     
@@ -1202,9 +1190,6 @@ function renderInventoryGrid() {
         const isOutOfStock = currentStock === 0;
         const isLowStock = currentStock > 0 && currentStock <= minStock;
         const categoryLabel = getCategoryLabel(item.category || getCategoryFromName(item.itemName));
-        
-        // Get recipe usage info
-        const recipeInfo = getRecipeUsageInfo(item.itemName);
         
         return `
             <div class="inventory-card ${isOutOfStock ? 'out-of-stock' : isLowStock ? 'low-stock' : 'in-stock'}">
@@ -1240,18 +1225,6 @@ function renderInventoryGrid() {
                     </div>
                     
                     ${item.description ? `<div class="description">📝 ${item.description}</div>` : ''}
-                    
-                    <!-- Recipe Usage Display - EXACT FORMAT YOU REQUESTED -->
-                    <div class="recipe-usage-info">
-                        <div class="recipe-item can-make">
-                            ✅ Can be made: ${recipeInfo.usedInCount} dishes
-                        </div>
-                        ${recipeInfo.notUsedInCount > 0 ? `
-                        <div class="recipe-item cannot-make">
-                            ❌ Cannot be made: ${recipeInfo.notUsedInCount} dishes
-                        </div>
-                        ` : ''}
-                    </div>
                 </div>
             </div>
         `;
@@ -1277,12 +1250,10 @@ function renderFilteredInventoryGrid(filteredItems) {
     elements.inventoryGrid.innerHTML = filteredItems.map(item => {
         const currentStock = parseFloat(item.currentStock) || 0;
         const minStock = parseFloat(item.minStock) || 10;
+        const maxStock = parseFloat(item.maxStock) || 50;
         const isOutOfStock = currentStock === 0;
         const isLowStock = currentStock > 0 && currentStock <= minStock;
         const categoryLabel = getCategoryLabel(item.category || getCategoryFromName(item.itemName));
-        
-        // Get recipe usage info
-        const recipeInfo = getRecipeUsageInfo(item.itemName);
         
         return `
             <div class="inventory-card ${isOutOfStock ? 'out-of-stock' : isLowStock ? 'low-stock' : 'in-stock'}">
@@ -1307,21 +1278,14 @@ function renderFilteredInventoryGrid(filteredItems) {
                             <span class="label">Min:</span>
                             <span class="value">${minStock} ${item.unit || 'pieces'}</span>
                         </div>
+                        <div class="stock-row">
+                            <span class="label">Max:</span>
+                            <span class="value">${maxStock} ${item.unit || 'pieces'}</span>
+                        </div>
                     </div>
                     
                     <div class="status-display ${isOutOfStock ? 'status-out' : isLowStock ? 'status-low' : 'status-good'}">
                         ${isOutOfStock ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'In Stock'}
-                    </div>
-                    
-                    <div class="recipe-usage-info">
-                        <div class="recipe-item can-make">
-                            ✅ Can be made: ${recipeInfo.usedInCount} dishes
-                        </div>
-                        ${recipeInfo.notUsedInCount > 0 ? `
-                        <div class="recipe-item cannot-make">
-                            ❌ Cannot be made: ${recipeInfo.notUsedInCount} dishes
-                        </div>
-                        ` : ''}
                     </div>
                 </div>
             </div>
@@ -1354,9 +1318,6 @@ function renderFilteredDashboardGrid(filteredItems) {
         const isLowStock = currentStock > 0 && currentStock <= minStock;
         const percentage = maxStock > 0 ? Math.min(100, (currentStock / maxStock) * 100) : 0;
         
-        // Get recipe usage info
-        const recipeInfo = getRecipeUsageInfo(item.itemName);
-        
         return `
             <div class="dashboard-card ${isOutOfStock ? 'out-of-stock' : isLowStock ? 'low-stock' : 'in-stock'}">
                 <div class="card-header">
@@ -1376,8 +1337,14 @@ function renderFilteredDashboardGrid(filteredItems) {
                     </div>
                     <div class="card-details">
                         <div class="detail">
-                            <span class="label">Can Be Made:</span>
-                            <span class="value">${recipeInfo.usedInCount} dish${recipeInfo.usedInCount !== 1 ? 'es' : ''}</span>
+                            <span class="label">Min:</span>
+                            <span class="value">${minStock}${unit}</span>
+                        </div>
+                        <div class="detail">
+                            <span class="label">Status:</span>
+                            <span class="value ${isOutOfStock ? 'text-danger' : isLowStock ? 'text-warning' : 'text-success'}">
+                                ${isOutOfStock ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'In Stock'}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -1471,67 +1438,30 @@ function showRecipeInfo(itemName) {
     }
 }
 
-// ==================== FIXED RECIPE USAGE HELPER FUNCTION ====================
-function getRecipeUsageInfo(itemName) {
-    // Check if THIS ingredient is in stock
-    const thisIngredient = allInventoryItems.find(inv => inv.itemName === itemName);
-    const thisStock = thisIngredient ? parseFloat(thisIngredient.currentStock || 0) : 0;
-    
-    // If THIS ingredient is out of stock, show 0 for both
-    if (thisStock <= 0) {
-        return {
-            usedInCount: 0,
-            notUsedInCount: 0,
-            totalDishes: 0
-        };
-    }
-    
-    // Get all menu items that use this ingredient
-    const usedInDishes = recipeMapping[itemName] || [];
-    
-    // Build a stock lookup map
-    const stockMap = new Map();
-    allInventoryItems.forEach(item => {
-        stockMap.set(item.itemName, parseFloat(item.currentStock || 0));
-    });
-    
-    // Build reverse mapping (dish → ingredients) once
-    const dishToIngredients = new Map();
-    for (const ingredient in recipeMapping) {
-        recipeMapping[ingredient].forEach(dish => {
-            if (!dishToIngredients.has(dish)) {
-                dishToIngredients.set(dish, []);
-            }
-            dishToIngredients.get(dish).push(ingredient);
-        });
-    }
-    
-    // Count dishes that CAN be made
-    let canBeMadeCount = 0;
-    
-    usedInDishes.forEach(dish => {
-        // Get required ingredients for this dish
-        const requiredIngredients = dishToIngredients.get(dish) || [];
-        
-        // Check if ALL required ingredients are in stock (stock > 0)
-        const canBeMade = requiredIngredients.every(ingredient => {
-            const stock = stockMap.get(ingredient) || 0;
-            return stock > 0;
-        });
-        
-        if (canBeMade) {
-            canBeMadeCount++;
-        }
-    });
-    
-    // Calculate how many dishes that use this ingredient CANNOT be made
-    const cannotBeMadeCount = usedInDishes.length - canBeMadeCount;
-    
-    return {
-        usedInCount: canBeMadeCount,           // Dishes that USE THIS INGREDIENT and CAN be made
-        notUsedInCount: cannotBeMadeCount,     // Dishes that USE THIS INGREDIENT but CANNOT be made
-        totalDishes: usedInDishes.length
-    };
+// ==================== INGREDIENT NAME MAPPING ====================
+// Maps inventory item names to recipe mapping names
+const ingredientNameMapping = {
+    'Coke': 'Carbonated soft drink',
+    'Soda': 'Carbonated soft drink',
+    'Carbonated soft drink': 'Carbonated soft drink',
+    'Carrots': 'Carrot',
+    'Carrot': 'Carrot',
+    'Cream dory fillet': 'Cream dory',
+    'Cream dory': 'Cream dory',
+    'Fish fillet': 'Fish',
+    'Fish': 'Fish',
+    'Pancit bihon': 'Rice noodles',
+    'Rice noodles': 'Rice noodles',
+    'Pancit canton': 'Pancit canton',
+    'Spaghetti pasta': 'Spaghetti pasta',
+    'Lumpiang wrapper': 'Lumpiang wrapper',
+    'French fries': 'French fries',
+    'Nacho chips': 'Nacho chips'
+};
+
+// Helper function to get the recipe mapping name for an ingredient
+function getRecipeMappingName(inventoryItemName) {
+    return ingredientNameMapping[inventoryItemName] || inventoryItemName;
 }
 
 // ==================== CHECK IF MENU ITEM CAN BE MADE ====================
@@ -2459,29 +2389,6 @@ document.addEventListener('DOMContentLoaded', function() {
             border-radius: 4px;
         }
         
-        /* Recipe Usage Info - EXACT FORMAT YOU REQUESTED */
-        .recipe-usage-info {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #e0e0e0;
-            font-size: 13px;
-        }
-        
-        .recipe-item {
-            margin-bottom: 4px;
-            line-height: 1.5;
-        }
-        
-        .recipe-item.can-make {
-            color: #28a745;
-            font-weight: 500;
-        }
-        
-        .recipe-item.cannot-make {
-            color: #dc3545;
-            font-weight: 500;
-        }
-        
         .text-success { color: #28a745; }
         .text-danger { color: #dc3545; }
         .text-warning { color: #ffc107; }
@@ -2666,7 +2573,6 @@ window.hideLoading = hideLoading;
 window.getInStockCount = getInStockCount;
 window.getInStockItems = getInStockItems;
 window.autoFillItemFromCategory = autoFillItemFromCategory;
-window.getRecipeUsageInfo = getRecipeUsageInfo;
 window.canMakeMenuItem = canMakeMenuItem;
 window.reduceStockForMenuItem = reduceStockForMenuItem;
 window.getAvailableMenuItems = getAvailableMenuItems;

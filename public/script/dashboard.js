@@ -39,7 +39,7 @@ const NAVIGATION_ROUTES = {
     'orderhistory': '/admindashboard/orderhistory',
     'addstaff': '/admindashboard/addstaff',
     'menumanagement': '/admindashboard/menumanagement',
-    'settings': '/admindashboard/settings'
+    'settings': '/admindashboard/infosettings'
 };
 
 // ==================== 🔴 DISABLE BACK BUTTON PREVENTION ====================

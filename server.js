@@ -10,7 +10,6 @@ import mongoose from "mongoose";
 import { connectDB } from "./config/database.js";
 import { WebSocketServer } from "ws";
 
-// Import models
 import User from "./models/User.js";
 import Category from "./models/categoryModel.js";
 import InventoryItem from "./models/InventoryItem.js";
@@ -24,10 +23,11 @@ import stockTransferRoute from "./routes/stockTransferroute.js";
 import staffRoutes from "./routes/staffroute.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
 import mongoDBInventoryService from "./services/mongoDBInventoryService.js";
+import revenueBreakdownService from "./services/revenueBreakdownService.js";
+import notificationService from "./services/notificationService.js";
 
 dotenv.config();
 
-// ==================== BUSINESS INFORMATION ====================
 const BUSINESS_INFO = {
     name: "G'RAY COUNTRYSIDE CAFÉ",
     address: "IPO Road, Barangay Minuyan Proper",
@@ -38,7 +38,6 @@ const BUSINESS_INFO = {
     permitNo: "BTRCP-2024-00123"
 };
 
-// ==================== AUTHENTICATION MIDDLEWARE ====================
 const verifyToken = (req, res, next) => {
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
     
@@ -86,7 +85,6 @@ const verifyAdmin = (req, res, next) => {
     next();
 };
 
-// ==================== CONFIGURATION ====================
 const CONFIG = {
     LOW_STOCK_THRESHOLD: 5,
     JWT_EXPIRY: "365d",
@@ -94,7 +92,6 @@ const CONFIG = {
     REQUIRED_ENV_VARS: ['JWT_SECRET', 'MONGODB_URI']
 };
 
-// Validate environment variables
 CONFIG.REQUIRED_ENV_VARS.forEach(varName => {
     if (!process.env[varName]) {
         console.error(`❌ ERROR: ${varName} not defined in .env file`);
@@ -102,9 +99,7 @@ CONFIG.REQUIRED_ENV_VARS.forEach(varName => {
     }
 });
 
-// ==================== RECIPE MAPPINGS ====================
 const recipeMapping = {
-    // ================ MEAT & POULTRY ================
     'Pork': [
         'Korean Spicy Bulgogi (Pork)',
         'Korean Salt and Pepper (Pork)',
@@ -150,8 +145,6 @@ const recipeMapping = {
     'Tuyo': [
         'Tuyo Pesto'
     ],
-    
-    // ================ FRESH PRODUCE ================
     'Garlic': [
         'Korean Spicy Bulgogi (Pork)',
         'Korean Salt and Pepper (Pork)',
@@ -228,8 +221,6 @@ const recipeMapping = {
         'Pancit Bihon',
         'Pancit Canton + Bihon (Mixed)'
     ],
-    
-    // ================ DAIRY & EGGS ================
     'Egg': [
         'Sizzling Pork Sisig',
         'Fried Rice'
@@ -266,8 +257,6 @@ const recipeMapping = {
         'Nachos Supreme',
         'Cheesy Dynamite Lumpia'
     ],
-    
-    // ================ PANTRY STAPLES ================
     'Gochujang': [
         'Korean Spicy Bulgogi (Pork)',
         'Korean Salt and Pepper (Pork)'
@@ -424,8 +413,6 @@ const recipeMapping = {
         'Sinigang (Shrimp)',
         'Fried Rice'
     ],
-    
-    // ================ NOODLES & PASTA ================
     'Pancit canton': [
         'Pancit Canton + Bihon (Mixed)'
     ],
@@ -436,8 +423,6 @@ const recipeMapping = {
     'Spaghetti pasta': [
         'Spaghetti (Filipino Style)'
     ],
-    
-    // ================ RICE ================
     'Rice': [
         'Korean Spicy Bulgogi (Pork)',
         'Korean Salt and Pepper (Pork)',
@@ -463,8 +448,6 @@ const recipeMapping = {
         'Buttered Shrimp',
         'Special Bulalo'
     ],
-    
-    // ================ BEVERAGES ================
     'Lemon juice': [
         'Cucumber Lemonade',
         'Blue Lemonade'
@@ -499,8 +482,6 @@ const recipeMapping = {
     'Chicken broth': [
         'Special Bulalo'
     ],
-    
-    // ================ COFFEE & TEA INGREDIENTS ================
     'Coffee beans': [
         'Cafe Americano',
         'Cafe Latte',
@@ -531,8 +512,6 @@ const recipeMapping = {
     'Cookie crumbs': [
         'Cookies & Cream'
     ],
-    
-    // ================ SNACKS & SIDES ================
     'Nacho chips': [
         'Cheesy Nachos',
         'Nachos Supreme'
@@ -548,8 +527,6 @@ const recipeMapping = {
     'Bread': [
         'Clubhouse Sandwich'
     ],
-    
-    // ================ PACKAGING ================
     'Paper cups': [
         'Cucumber Lemonade',
         'Blue Lemonade',
@@ -642,7 +619,6 @@ const recipeMapping = {
     ]
 };
 
-// Create reverse mapping
 const reverseRecipeMapping = {};
 for (const [ingredient, dishes] of Object.entries(recipeMapping)) {
     for (const dish of dishes) {
@@ -655,7 +631,6 @@ for (const [ingredient, dishes] of Object.entries(recipeMapping)) {
     }
 }
 
-// ==================== HELPER FUNCTIONS ====================
 class HelperFunctions {
     static generateCustomerId() {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -681,9 +656,41 @@ class HelperFunctions {
     }
 
     static getTodayDateRange() {
-        const today = new Date();
-        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
-        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+        // Philippine Time is UTC+8
+        // Get current UTC time, add 8 hours to get PHT
+        const now = new Date();
+        const phtOffset = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+        const phtNow = new Date(now.getTime() + phtOffset);
+        
+        // Get year, month, day in UTC (which represents PHT after offset)
+        const year = phtNow.getUTCFullYear();
+        const month = phtNow.getUTCMonth();
+        const date = phtNow.getUTCDate();
+        
+        // Create date range in UTC representing PHT dates
+        // 00:00 PHT = UTC-8 hours
+        // 23:59 PHT = UTC-8 hours + 23:59
+        const startOfDay = new Date(Date.UTC(year, month, date, 0, 0, 0, 0));
+        const endOfDay = new Date(Date.UTC(year, month, date, 23, 59, 59, 999));
+        
+        const phtDisplay = startOfDay.toLocaleString('en-PH', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            timeZone: 'Asia/Manila'
+        });
+        
+        console.log(`⏰ Date Range (PHT): ${phtDisplay} to ${endOfDay.toLocaleString('en-PH', { 
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            timeZone: 'Asia/Manila'
+        })}`);
+        console.log(`   UTC: ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
+        
         return { startOfDay, endOfDay };
     }
 
@@ -715,14 +722,13 @@ class HelperFunctions {
     }
 
     static calculateVAT(subtotal) {
-        const vatRate = 0.12; // 12% VAT in Philippines
+        const vatRate = 0.12;
         const vat = subtotal * vatRate;
         const net = subtotal - vat;
         return { vat, net };
     }
 }
 
-// ==================== RECIPE MANAGEMENT ====================
 class RecipeManager {
     static async checkProductAvailability(productName) {
         try {
@@ -886,29 +892,24 @@ class RecipeManager {
     }
 }
 
-// ==================== DASHBOARD STATISTICS ====================
 class DashboardStats {
     static async getStats() {
         try {
             console.log('📊 Calculating dashboard statistics...');
             const { startOfDay, endOfDay } = HelperFunctions.getTodayDateRange();
             
-            // Get ALL orders count
             const totalOrders = await Order.countDocuments({ status: 'completed' });
             console.log(`📦 Total Orders: ${totalOrders}`);
             
-            // Get TODAY'S orders count
             const todaysOrders = await Order.countDocuments({ 
                 status: 'completed',
                 createdAt: { $gte: startOfDay, $lte: endOfDay }
             });
             console.log(`📦 Today's Orders: ${todaysOrders}`);
             
-            // Get total customers
             const totalCustomers = await Customer.countDocuments();
             console.log(`👥 Total Customers: ${totalCustomers}`);
             
-            // Get menu items count
             const totalMenuItems = await MenuItem.countDocuments({ isActive: true });
             const availableMenuItems = await MenuItem.countDocuments({ 
                 status: 'available', 
@@ -916,7 +917,6 @@ class DashboardStats {
             });
             console.log(`🍽️ Total Menu Items: ${totalMenuItems}, Available: ${availableMenuItems}`);
             
-            // Get inventory counts
             const totalInventoryItems = await InventoryItem.countDocuments();
             const inventoryLowStock = await InventoryItem.countDocuments({ 
                 currentStock: { $gt: 0, $lt: CONFIG.LOW_STOCK_THRESHOLD }, 
@@ -928,10 +928,8 @@ class DashboardStats {
             });
             console.log(`📦 Total Inventory: ${totalInventoryItems}, Low Stock: ${inventoryLowStock}, Out of Stock: ${inventoryOutOfStock}`);
             
-            // Get top selling products
             const topSellingProducts = await Order.aggregate([
                 { $unwind: '$items' },
-                // Use whichever field has a value (itemName or name)
                 { $group: { 
                     _id: { 
                         $cond: [
@@ -953,7 +951,6 @@ class DashboardStats {
                     totalQuantity: { $sum: '$items.quantity' },
                     totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } }
                 }},
-                // Filter out null and empty items
                 { 
                     $match: { 
                         _id: { 
@@ -975,7 +972,6 @@ class DashboardStats {
                 console.log(`   [${idx + 1}] ${item._id}: ${item.totalQuantity} units = ₱${item.totalRevenue.toFixed(2)}`);
             });
             
-            // Calculate total revenue (ALL orders)
             const totalRevenueResult = await Order.aggregate([
                 { $match: { status: 'completed' } },
                 { $group: { _id: null, total: { $sum: '$total' } } }
@@ -983,7 +979,6 @@ class DashboardStats {
             const totalRevenue = totalRevenueResult[0]?.total || 0;
             console.log(`💰 Total Revenue: ₱${totalRevenue.toFixed(2)}`);
             
-            // Calculate today's revenue
             const todaysRevenueResult = await Order.aggregate([
                 { 
                     $match: { 
@@ -996,7 +991,6 @@ class DashboardStats {
             const todaysRevenue = todaysRevenueResult[0]?.total || 0;
             console.log(`💰 Today's Revenue: ₱${todaysRevenue.toFixed(2)}`);
             
-            // Calculate VAT for today
             const { vat: todaysVAT } = HelperFunctions.calculateVAT(todaysRevenue);
             const { vat: totalVAT } = HelperFunctions.calculateVAT(totalRevenue);
             
@@ -1054,7 +1048,6 @@ class DashboardStats {
     }
 }
 
-// ==================== REAL-TIME NOTIFICATIONS ====================
 class RealTimeManager {
     static adminClients = new Set();
     static staffClients = new Set();
@@ -1182,10 +1175,8 @@ class RealTimeManager {
     }
 }
 
-// ==================== DATABASE INITIALIZATION ====================
 const initializeDatabase = async () => {
     try {
-        // Create admin user if not exists
         const adminExists = await User.findOne({ username: 'admin' });
         if (!adminExists) {
             const hashedPassword = bcrypt.hashSync('admin123', 10);
@@ -1200,7 +1191,6 @@ const initializeDatabase = async () => {
             });
         }
         
-        // Create default categories if not exists
         const categoryCount = await Category.countDocuments();
         if (categoryCount === 0) {
             const defaultCategories = [
@@ -1218,7 +1208,6 @@ const initializeDatabase = async () => {
             await Category.insertMany(defaultCategories);
         }
         
-        // Clean up invalid menu items
         await MenuItem.deleteMany({
             $or: [
                 { itemName: null },
@@ -1235,52 +1224,37 @@ const initializeDatabase = async () => {
     }
 };
 
-// ==================== EXPRESS APP SETUP ====================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Connect to database
 await connectDB();
 await initializeDatabase();
 
-// Initialize MongoDB Inventory Service
 await mongoDBInventoryService.initialize();
 
-// Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/images', express.static(path.join(__dirname, "images")));
 
-// Set view engine
 app.set("view engine", "ejs");
 app.set('views', path.join(__dirname, 'views'));
 
-// Use routes
 app.use('/api/stock-transfers', stockTransferRoute);
 app.use('/api/staff', staffRoutes);
-// app.use('/api/inventory', inventoryRoutes);
 
-// Add authentication middleware
 app.use('/api/stock-transfers', verifyToken);
 app.use('/api/staff', verifyToken);
-// app.use('/api/inventory', verifyToken);
 
-// ==================== ROUTES ====================
-
-// ==================== MENU MANAGEMENT ROUTES ====================
-
-// GET all menu items with inventory availability check
 app.get('/api/menu', verifyToken, async (req, res) => {
     try {
         console.log('📋 API: Fetching all menu items with inventory check...');
         const menuItems = await MenuItem.find({}).lean();
         
         const formattedItems = await Promise.all(menuItems.map(async (item) => {
-            // Check if required ingredients are available
             const availability = await RecipeManager.checkProductAvailability(item.itemName || item.name);
             const currentStock = item.currentStock || 0;
             
@@ -1296,7 +1270,6 @@ app.get('/api/menu', verifyToken, async (req, res) => {
                 maxStock: item.maxStock || 0,
                 unit: item.unit,
                 image: item.image,
-                // Status depends on BOTH ingredients AND stock availability
                 isActive: item.isActive !== false && availability.available && currentStock > 0,
                 status: (availability.available && currentStock > 0) ? 'available' : 'out_of_stock',
                 itemType: item.itemType || 'finished',
@@ -1330,7 +1303,6 @@ app.get('/api/menu', verifyToken, async (req, res) => {
     }
 });
 
-// GET single menu item by ID
 app.get('/api/menu/:itemId', verifyToken, async (req, res) => {
     try {
         console.log(`📋 API: Fetching menu item ${req.params.itemId}...`);
@@ -1343,7 +1315,6 @@ app.get('/api/menu/:itemId', verifyToken, async (req, res) => {
             });
         }
         
-        // Check availability
         const availability = await RecipeManager.checkProductAvailability(menuItem.itemName || menuItem.name);
         
         const formatted = {
@@ -1379,7 +1350,6 @@ app.get('/api/menu/:itemId', verifyToken, async (req, res) => {
     }
 });
 
-// CHECK menu item availability
 app.get('/api/menu/:itemName/availability', verifyToken, async (req, res) => {
     try {
         const itemName = decodeURIComponent(req.params.itemName);
@@ -1405,14 +1375,12 @@ app.get('/api/menu/:itemName/availability', verifyToken, async (req, res) => {
     }
 });
 
-// CREATE new menu item
 app.post('/api/menu', verifyToken, verifyAdmin, async (req, res) => {
     try {
         console.log('✏️ API: Creating new menu item...', JSON.stringify(req.body, null, 2));
         
         const { name, itemName, category, price, unit, currentStock, minStock, maxStock, image, isActive, itemType } = req.body;
         
-        // Validation
         if (!name && !itemName) {
             console.error('❌ Validation failed: Item name is required');
             return res.status(400).json({
@@ -1493,7 +1461,6 @@ app.post('/api/menu', verifyToken, verifyAdmin, async (req, res) => {
         
         console.log(`✅ Menu item created: ${menuItem._id}`);
         
-        // Broadcast real-time update
         RealTimeManager.broadcastToAdmins({
             type: 'menu_update',
             action: 'created',
@@ -1522,14 +1489,12 @@ app.post('/api/menu', verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
-// UPDATE menu item
 app.put('/api/menu/:itemId', verifyToken, verifyAdmin, async (req, res) => {
     try {
         console.log(`✏️ API: Updating menu item ${req.params.itemId}...`, JSON.stringify(req.body, null, 2));
         
         const itemId = req.params.itemId;
         
-        // Skip fallback IDs (they don't exist in MongoDB)
         if (itemId.startsWith('fallback_')) {
             console.log(`⏭️ Skipping fallback item (not in MongoDB): ${itemId}`);
             return res.status(200).json({
@@ -1554,7 +1519,6 @@ app.put('/api/menu/:itemId', verifyToken, verifyAdmin, async (req, res) => {
         const parsedMinStock = Number(minStock) || 0;
         const parsedMaxStock = Number(maxStock) || 100;
         
-        // Validate it's a valid MongoDB ObjectId before querying
         if (!itemId.match(/^[0-9a-fA-F]{24}$/)) {
             console.error(`❌ Invalid MongoDB ID: ${itemId}`);
             return res.status(400).json({
@@ -1563,7 +1527,6 @@ app.put('/api/menu/:itemId', verifyToken, verifyAdmin, async (req, res) => {
             });
         }
         
-        // Find and update
         const menuItem = await MenuItem.findByIdAndUpdate(
             itemId,
             {
@@ -1610,7 +1573,6 @@ app.put('/api/menu/:itemId', verifyToken, verifyAdmin, async (req, res) => {
         
         console.log(`✅ Menu item updated: ${menuItem._id}`);
         
-        // Broadcast real-time update
         RealTimeManager.broadcastToAdmins({
             type: 'menu_update',
             action: 'updated',
@@ -1633,13 +1595,11 @@ app.put('/api/menu/:itemId', verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
-// DELETE menu item
 app.delete('/api/menu/:itemId', verifyToken, verifyAdmin, async (req, res) => {
     try {
         const itemId = req.params.itemId;
         console.log(`🗑️ API: Deleting menu item ${itemId}...`);
         
-        // Skip fallback IDs (they don't exist in MongoDB)
         if (itemId.startsWith('fallback_')) {
             console.log(`⏭️ Skipping fallback item deletion (not in MongoDB): ${itemId}`);
             return res.status(200).json({
@@ -1649,7 +1609,6 @@ app.delete('/api/menu/:itemId', verifyToken, verifyAdmin, async (req, res) => {
             });
         }
         
-        // Validate it's a valid MongoDB ObjectId before querying
         if (!itemId.match(/^[0-9a-fA-F]{24}$/)) {
             console.error(`❌ Invalid MongoDB ID: ${itemId}`);
             return res.status(400).json({
@@ -1670,7 +1629,6 @@ app.delete('/api/menu/:itemId', verifyToken, verifyAdmin, async (req, res) => {
         
         console.log(`✅ Menu item deleted: ${itemId}`);
         
-        // Broadcast real-time update
         RealTimeManager.broadcastToAdmins({
             type: 'menu_update',
             action: 'deleted',
@@ -1691,8 +1649,6 @@ app.delete('/api/menu/:itemId', verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
-// ==================== STAFF STOCK UPDATE ENDPOINT ====================
-// Allow staff to update product stock without admin privileges
 app.put('/api/menu/:itemId/stock', verifyToken, async (req, res) => {
     try {
         const itemId = req.params.itemId;
@@ -1700,7 +1656,6 @@ app.put('/api/menu/:itemId/stock', verifyToken, async (req, res) => {
         
         console.log(`📦 Stock update request for ${itemId}: ${currentStock}`);
         
-        // Validate stock is a number
         const parsedStock = Number(currentStock);
         if (isNaN(parsedStock) || parsedStock < 0) {
             console.error('❌ Invalid stock value:', currentStock);
@@ -1710,7 +1665,6 @@ app.put('/api/menu/:itemId/stock', verifyToken, async (req, res) => {
             });
         }
         
-        // Skip fallback IDs (they don't exist in MongoDB)
         if (itemId.startsWith('fallback_') || itemId.startsWith('temp_')) {
             console.log(`⏭️ Skipping fallback/temp item (not in MongoDB): ${itemId}`);
             return res.status(200).json({
@@ -1720,7 +1674,6 @@ app.put('/api/menu/:itemId/stock', verifyToken, async (req, res) => {
             });
         }
         
-        // Validate it's a valid MongoDB ObjectId
         if (!itemId.match(/^[0-9a-fA-F]{24}$/)) {
             console.error(`❌ Invalid MongoDB ID: ${itemId}`);
             return res.status(400).json({
@@ -1729,7 +1682,6 @@ app.put('/api/menu/:itemId/stock', verifyToken, async (req, res) => {
             });
         }
         
-        // Update only the stock field
         const menuItem = await MenuItem.findByIdAndUpdate(
             itemId,
             { currentStock: parsedStock },
@@ -1765,7 +1717,6 @@ app.put('/api/menu/:itemId/stock', verifyToken, async (req, res) => {
     }
 });
 
-// Real-time events endpoint for admin
 app.get('/api/admin/events', verifyToken, verifyAdmin, (req, res) => {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -1789,7 +1740,6 @@ app.get('/api/admin/events', verifyToken, verifyAdmin, (req, res) => {
     });
 });
 
-// Real-time events endpoint for staff
 app.get('/api/staff/events', verifyToken, (req, res) => {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -1814,7 +1764,6 @@ app.get('/api/staff/events', verifyToken, (req, res) => {
     });
 });
 
-// Dashboard stats endpoint
 app.get("/api/dashboard/stats", verifyToken, verifyAdmin, async (req, res) => {
     try {
         console.log('📊 API: Fetching dashboard stats...');
@@ -1834,12 +1783,10 @@ app.get("/api/dashboard/stats", verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
-// Inventory status endpoint
 app.get("/api/inventory/status", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 10;
         
-        // Get all inventory items, sorted by stock level (lowest first)
         const inventoryItems = await InventoryItem.find({ 
             isActive: true 
         })
@@ -1847,7 +1794,6 @@ app.get("/api/inventory/status", verifyToken, verifyAdmin, async (req, res) => {
         .limit(limit)
         .lean();
         
-        // Format items to ensure unit field is always populated
         const formattedItems = inventoryItems.map(item => ({
             ...item,
             unit: item.unit || 'pieces',
@@ -1857,7 +1803,6 @@ app.get("/api/inventory/status", verifyToken, verifyAdmin, async (req, res) => {
             maxStock: item.maxStock || 50
         }));
         
-        // Log detailed information about what's being returned
         console.log('📦 Inventory Status API Query:');
         console.log(`  - Limit: ${limit}`);
         console.log(`  - Items found: ${formattedItems.length}`);
@@ -1879,8 +1824,6 @@ app.get("/api/inventory/status", verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
-// ==================== GET OUT OF STOCK PRODUCTS ====================
-// Returns products that are completely out of stock (stock = 0)
 app.get("/api/products/out-of-stock", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const outOfStockProducts = await Product.find({ stock: 0 })
@@ -1906,20 +1849,16 @@ app.get("/api/products/out-of-stock", verifyToken, verifyAdmin, async (req, res)
     }
 });
 
-// ==================== GET ALL INVENTORY ITEMS (For Menu Management Availability Check) ====================
-// Returns ALL inventory items - used by menu management to check ingredient availability
 app.get("/api/inventory", verifyToken, async (req, res) => {
     try {
         console.log('📦 API: /api/inventory - Fetching ALL inventory items for availability check...');
         
-        // Get ALL inventory items (no filter, no limit)
         const inventoryItems = await InventoryItem.find()
             .sort({ itemName: 1 })
             .lean();
         
         console.log(`📦 Inventory API returning ${inventoryItems.length} items`);
         
-        // Log first few items for debugging
         if (inventoryItems.length > 0) {
             console.log('   Sample items:');
             inventoryItems.slice(0, 3).forEach(item => {
@@ -1942,7 +1881,6 @@ app.get("/api/inventory", verifyToken, async (req, res) => {
     }
 });
 
-// Today's orders endpoint
 app.get("/api/orders/today", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 5;
@@ -1956,7 +1894,6 @@ app.get("/api/orders/today", verifyToken, verifyAdmin, async (req, res) => {
         .limit(limit)
         .lean();
         
-        // If no orders today, try fetching from last 7 days as fallback
         if (orders.length === 0) {
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -1984,7 +1921,6 @@ app.get("/api/orders/today", verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
-// Top selling items endpoint
 app.get("/api/orders/top-items", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 5;
@@ -2041,12 +1977,131 @@ app.get("/api/orders/top-items", verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
-// Sales chart data endpoint
+app.get("/api/revenue/breakdown", verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        console.log(`\n${'='.repeat(60)}`);
+        console.log('📊 API: /api/revenue/breakdown REQUEST');
+        console.log(`${'='.repeat(60)}`);
+        
+        const { startOfDay, endOfDay } = HelperFunctions.getTodayDateRange();
+        
+        console.log(`Date: ${startOfDay.toISOString().split('T')[0]}`);
+        console.log(`Time Range: ${startOfDay.toLocaleString('en-PH')} to ${endOfDay.toLocaleString('en-PH')}`);
+        
+        const result = await revenueBreakdownService.calculateAndSaveToday({
+            startOfDay,
+            endOfDay
+        });
+        
+        if (result.success) {
+            console.log(`\n✅ API Response: SUCCESS`);
+            console.log(`  Total Revenue: ₱${result.data.totalRevenue.toFixed(2)}`);
+            console.log(`  Total Items: ${result.data.totalItems}`);
+            console.log(`  Total Orders: ${result.data.totalOrders}`);
+            console.log(`  Top Category: ${result.data.topCategory.name}`);
+        } else {
+            console.log(`\n❌ API Response: FAILED`);
+            console.log(`  Error: ${result.message}`);
+        }
+        
+        console.log(`${'='.repeat(60)}\n`);
+        
+        res.json(result);
+        
+    } catch (error) {
+        console.error('❌ Error calculating revenue breakdown:', error);
+        console.log(`${'='.repeat(60)}\n`);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to calculate revenue breakdown',
+            error: error.message
+        });
+    }
+});
+
+app.get("/api/revenue/breakdown/date/:date", verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const targetDate = new Date(req.params.date);
+        const breakdown = await revenueBreakdownService.getBreakdownByDate(targetDate);
+        
+        if (!breakdown) {
+            return res.status(404).json({
+                success: false,
+                message: 'No breakdown data found for this date'
+            });
+        }
+        
+        res.json({
+            success: true,
+            data: {
+                breakdown: breakdown.breakdown,
+                totalRevenue: breakdown.totalRevenue,
+                totalOrders: breakdown.totalOrders,
+                date: breakdown.dateString,
+                lastUpdated: breakdown.lastUpdated
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error fetching breakdown by date:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch breakdown'
+        });
+    }
+});
+
+app.get("/api/revenue/breakdown/history", verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const days = parseInt(req.query.days) || 7;
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        
+        const breakdowns = await revenueBreakdownService.getHistoricalBreakdown(startDate, endDate);
+        
+        res.json({
+            success: true,
+            data: breakdowns,
+            count: breakdowns.length,
+            period: {
+                start: startDate.toISOString().split('T')[0],
+                end: endDate.toISOString().split('T')[0]
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error fetching historical breakdown:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch historical breakdown'
+        });
+    }
+});
+
+app.get("/api/revenue/breakdown/top-categories", verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 5;
+        const { startOfDay, endOfDay } = HelperFunctions.getTodayDateRange();
+        
+        const topCategories = await revenueBreakdownService.getTopCategories(limit, startOfDay, endOfDay);
+        
+        res.json({
+            success: true,
+            data: topCategories,
+            count: topCategories.length
+        });
+    } catch (error) {
+        console.error('❌ Error fetching top categories:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch top categories'
+        });
+    }
+});
+
 app.get("/api/sales/chart", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const days = parseInt(req.query.days) || 7;
         
-        // Generate dates for the last X days
         const dates = [];
         const now = new Date();
         
@@ -2056,7 +2111,6 @@ app.get("/api/sales/chart", verifyToken, verifyAdmin, async (req, res) => {
             dates.push(date);
         }
         
-        // Get sales data for each day
         const salesData = [];
         
         for (const date of dates) {
@@ -2096,7 +2150,6 @@ app.get("/api/sales/chart", verifyToken, verifyAdmin, async (req, res) => {
     } catch (error) {
         console.error('❌ Error fetching sales chart data:', error);
         
-        // Generate mock data as fallback
         const fallbackData = generateFallbackSalesData();
         
         res.json({
@@ -2135,12 +2188,10 @@ function generateFallbackSalesData() {
     });
 }
 
-// Create order endpoint - with VAT calculation
 app.post('/api/orders', verifyToken, async (req, res) => {
     try {
         const orderData = req.body;
         
-        // Validation
         if (!orderData.items || !orderData.items.length) {
             return res.status(400).json({ 
                 success: false, 
@@ -2173,12 +2224,10 @@ app.post('/api/orders', verifyToken, async (req, res) => {
             });
         }
         
-        // Set default order type
         if (!orderData.type) {
             orderData.type = "Dine In";
         }
         
-        // Generate order number with TODAY'S date
         const { startOfDay } = HelperFunctions.getTodayDateRange();
         const orderCount = await Order.countDocuments({
             createdAt: {
@@ -2193,11 +2242,46 @@ app.post('/api/orders', verifyToken, async (req, res) => {
             currentTime: new Date().toLocaleString('en-PH')
         });
         
-        // Calculate VAT
-        const subtotal = orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const processedItems = [];
+        for (const item of orderData.items) {
+            let finalItemName = item.itemName || item.name;
+            let finalProductId = item.id || item.productId;
+            let finalPrice = item.price;
+            
+            if (!finalItemName && finalProductId) {
+                try {
+                    const menuItem = await MenuItem.findById(finalProductId).lean();
+                    if (menuItem) {
+                        finalItemName = menuItem.itemName || menuItem.name;
+                        finalPrice = menuItem.price || finalPrice;
+                        console.log(`📌 Fetched item from MenuItem: ${finalItemName}`);
+                    }
+                } catch (err) {
+                    console.warn(`⚠️ Could not fetch MenuItem ${finalProductId}: ${err.message}`);
+                }
+            }
+            
+            if (!finalItemName) {
+                console.warn(`⚠️ Item has no name - using Unknown Item. Frontend data:`, item);
+                finalItemName = "Unknown Item";
+            }
+            
+            processedItems.push({
+                name: finalItemName,
+                price: finalPrice || 0,
+                quantity: item.quantity || 1,
+                size: item.size || "Regular",
+                image: item.image || 'default_food.jpg',
+                productId: finalProductId || null,
+                vatable: item.vatable !== undefined ? item.vatable : true
+            });
+            
+            console.log(`  ✓ Item: ${finalItemName} | Qty: ${item.quantity} | Price: ₱${finalPrice}`);
+        }
+        
+        const subtotal = processedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const { vat, net } = HelperFunctions.calculateVAT(subtotal);
         
-        // Handle customer
         let customerId = orderData.customerId;
         let customer = null;
         
@@ -2226,18 +2310,9 @@ app.post('/api/orders', verifyToken, async (req, res) => {
             await customer.save();
         }
         
-        // Create order with current date/time
         const order = new Order({
             orderNumber,
-            items: orderData.items.map(item => ({
-                name: item.itemName || item.name || "Unknown Item",
-                price: item.price || 0,
-                quantity: item.quantity || 1,
-                size: item.size || "Regular",
-                image: item.image || 'default_food.jpg',
-                productId: item.id || null,
-                vatable: item.vatable !== undefined ? item.vatable : true
-            })),
+            items: processedItems,
             subtotal: subtotal,
             tax: vat,
             total: orderData.total,
@@ -2257,163 +2332,144 @@ app.post('/api/orders', verifyToken, async (req, res) => {
         
         const savedOrder = await order.save();
         
-        // Generate receipt data
-        const receiptData = HelperFunctions.generateReceipt(savedOrder, customer);
-        
-        console.log('✅ Order created successfully for', BUSINESS_INFO.name, ':', {
+        console.log('✅ Order created successfully:', {
             orderId: savedOrder._id,
             orderNumber: savedOrder.orderNumber,
             customerId: customerId,
+            itemCount: processedItems.length,
             total: savedOrder.total,
             vat: vat,
             createdAt: savedOrder.createdAt.toLocaleString('en-PH')
         });
         
-        // Send real-time notifications
-        RealTimeManager.sendOrderNotification(savedOrder);
-        RealTimeManager.sendStatsUpdate();
+        const receiptData = HelperFunctions.generateReceipt(savedOrder, customer);
         
-        // Update inventory - reduce product stock and raw ingredients
-        for (const item of orderData.items) {
-            // 1️⃣ Reduce MenuItem stock (what staff sees in /api/menu)
-            // Frontend sends 'name' field, not 'itemName'
-            const itemName = item.itemName || item.name;
-            const menuItem = await MenuItem.findOne({
-                itemName: { $regex: new RegExp(`^${itemName}$`, 'i') }
-            });
-            
-            if (menuItem) {
-                const quantitySold = item.quantity || 1;
-                const previousStock = menuItem.currentStock || 0;
-                
-                menuItem.currentStock = Math.max(0, previousStock - quantitySold);
-                await menuItem.save();
-                
-                console.log(`📉 MenuItem stock reduced: ${item.itemName}`, {
-                    previousStock: previousStock,
-                    quantitySold: quantitySold,
-                    newStock: menuItem.currentStock,
-                    orderNumber: savedOrder.orderNumber
+        for (const item of processedItems) {
+            try {
+                const menuItem = await MenuItem.findOne({
+                    $or: [
+                        { itemName: { $regex: new RegExp(`^${item.name}$`, 'i') } },
+                        { name: { $regex: new RegExp(`^${item.name}$`, 'i') } }
+                    ]
                 });
                 
-                // 🔴 NOTIFY ADMIN IF MENU ITEM GOES OUT OF STOCK
-                if (menuItem.currentStock === 0 && previousStock > 0) {
-                    console.log(`⚠️ ALERT: ${itemName} is now OUT OF STOCK!`);
-                    RealTimeManager.sendOutOfStockAlert({
-                        productId: menuItem._id,
-                        productName: itemName,
-                        category: menuItem.category,
-                        previousStock: previousStock,
-                        timestamp: new Date()
-                    });
-                }
-            }
-            
-            // 2️⃣ Reduce Product stock (finished goods backup)
-            const product = await Product.findOne({
-                itemName: { $regex: new RegExp(`^${itemName}$`, 'i') }
-            });
-            
-            if (product) {
-                const quantitySold = item.quantity || 1;
-                const previousStock = product.stock || 0;
-                
-                product.stock = Math.max(0, previousStock - quantitySold);
-                await product.save();
-                
-                console.log(`📉 Product stock reduced: ${itemName}`, {
-                    previousStock: previousStock,
-                    quantitySold: quantitySold,
-                    newStock: product.stock,
-                    orderNumber: savedOrder.orderNumber
-                });
-                
-                // 🔴 NOTIFY ADMIN IF STOCK REACHES ZERO
-                if (product.stock === 0 && previousStock > 0) {
-                    console.log(`⚠️ ALERT: ${itemName} is now OUT OF STOCK!`);
-                    RealTimeManager.sendOutOfStockAlert({
-                        productId: product._id,
-                        productName: product.itemName,
-                        category: product.category,
-                        previousStock: previousStock,
-                        timestamp: new Date()
-                    });
-                }
-            }
-            
-            // 3️⃣ Reduce raw ingredient inventory
-            const requiredIngredients = reverseRecipeMapping[itemName];
-            if (requiredIngredients && requiredIngredients.length > 0) {
-                for (const ingredient of requiredIngredients) {
-                    const inventoryItem = await InventoryItem.findOne({
-                        itemName: { $regex: new RegExp(`^${ingredient}$`, 'i') },
-                        itemType: 'raw'
-                    });
+                if (menuItem) {
+                    const quantitySold = item.quantity || 1;
+                    const previousStock = menuItem.currentStock || 0;
                     
-                    if (inventoryItem) {
-                        const usageQuantity = item.quantity || 1;
-                        
-                        if (inventoryItem.currentStock >= usageQuantity) {
-                            const previousStock = inventoryItem.currentStock;
-                            inventoryItem.currentStock -= usageQuantity;
-                            
-                            // Add to usage history
-                            if (!inventoryItem.usageHistory) {
-                                inventoryItem.usageHistory = [];
-                            }
-                            
-                            inventoryItem.usageHistory.push({
-                                quantity: usageQuantity,
-                                notes: `Used for ${item.quantity}x ${itemName} (Order: ${savedOrder.orderNumber})`,
-                                usedBy: req.user.username,
-                                usedAt: new Date()
-                            });
-                            
-                            await inventoryItem.save();
-                            
-                            console.log(`📉 Inventory stock reduced: ${ingredient}`, {
-                                previousStock: previousStock,
-                                usageQuantity: usageQuantity,
-                                newStock: inventoryItem.currentStock,
-                                orderNumber: savedOrder.orderNumber
-                            });
-                            
-                            // Send low stock alert if needed
-                            if (inventoryItem.currentStock > 0 && inventoryItem.currentStock < (inventoryItem.minStock || 10)) {
-                                RealTimeManager.sendLowStockAlert(inventoryItem);
-                            }
-                            
-                            // Check affected menu items
-                            await RecipeManager.checkAffectedMenuItems(ingredient);
-                        }
+                    menuItem.currentStock = Math.max(0, previousStock - quantitySold);
+                    
+                    if (menuItem.currentStock <= 0) {
+                        menuItem.status = 'out_of_stock';
+                    } else if (menuItem.currentStock <= menuItem.minStock) {
+                        menuItem.status = 'low_stock';
+                    } else {
+                        menuItem.status = 'in_stock';
                     }
+                    
+                    await menuItem.save();
+                    
+                    console.log(`📉 Updated inventory: ${item.name}`, {
+                        quantitySold: quantitySold,
+                        newStock: menuItem.currentStock,
+                        status: menuItem.status
+                    });
+                } else {
+                    console.warn(`⚠️ MenuItem not found for: ${item.name} (inventory not updated)`);
                 }
+            } catch (err) {
+                console.error(`❌ Error updating inventory for ${item.name}:`, err.message);
             }
         }
         
-        res.json({ 
-            success: true, 
-            orderId: savedOrder._id,
-            orderNumber: savedOrder.orderNumber,
-            customerId: customerId,
-            receipt: receiptData,
-            message: "Payment and order processed successfully",
-            change: change,
-            timestamp: savedOrder.createdAt,
-            vat: vat,
-            subtotal: subtotal
+        RealTimeManager.sendOrderNotification(savedOrder);
+        RealTimeManager.sendStatsUpdate();
+        
+        res.json({
+            success: true,
+            message: "Order created successfully",
+            data: {
+                orderId: savedOrder._id,
+                orderNumber: savedOrder.orderNumber,
+                customerId: customerId,
+                total: savedOrder.total,
+                tax: vat,
+                change: change,
+                receipt: receiptData,
+                itemsProcessed: processedItems.length,
+                createdAt: savedOrder.createdAt
+            }
         });
         
     } catch (error) {
-        console.error('Order creation error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: error.message || "Failed to save order to database"
+        console.error('❌ Error creating order:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || "Failed to create order"
         });
     }
 });
 
-// Receipt endpoint
+// Get all orders
+app.get('/api/orders', verifyToken, async (req, res) => {
+    try {
+        console.log('📦 API: Fetching all orders...');
+        
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const skip = (page - 1) * limit;
+        
+        // Build filter
+        let filter = {};
+        
+        if (req.query.status) {
+            filter.status = req.query.status;
+        }
+        
+        if (req.query.customerId) {
+            filter.customerId = req.query.customerId;
+        }
+        
+        // Date range filtering
+        if (req.query.startDate && req.query.endDate) {
+            filter.createdAt = {
+                $gte: new Date(req.query.startDate),
+                $lte: new Date(req.query.endDate)
+            };
+        }
+        
+        // Get total count for pagination
+        const total = await Order.countDocuments(filter);
+        
+        // Fetch orders
+        const orders = await Order.find(filter)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean();
+        
+        console.log(`✅ Orders fetched: ${orders.length} items (Page ${page}, Total: ${total})`);
+        
+        res.json({
+            success: true,
+            data: orders,
+            pagination: {
+                page: page,
+                limit: limit,
+                total: total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error fetching orders:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch orders',
+            error: error.message
+        });
+    }
+});
+
 app.get('/api/orders/:orderId/receipt', verifyToken, async (req, res) => {
     try {
         const orderId = req.params.orderId;
@@ -2445,7 +2501,6 @@ app.get('/api/orders/:orderId/receipt', verifyToken, async (req, res) => {
     }
 });
 
-// Customer list endpoint
 app.get('/api/customers', verifyToken, verifyAdmin, async (req, res) => {
     try {
         const { page = 1, limit = 20, search = '' } = req.query;
@@ -2488,9 +2543,6 @@ app.get('/api/customers', verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
-// ==================== INVENTORY MANAGEMENT ROUTES ====================
-
-// GET all inventory items (for staff to check stock status)
 app.get('/api/inventory', verifyToken, async (req, res) => {
     try {
         console.log('📦 API: Fetching inventory items...');
@@ -2526,7 +2578,6 @@ app.get('/api/inventory', verifyToken, async (req, res) => {
     }
 });
 
-// GET inventory item by name (flexible matching) - searches both raw ingredients and menu items
 app.get('/api/inventory/name/:itemName', verifyToken, async (req, res) => {
     try {
         const itemName = decodeURIComponent(req.params.itemName);
@@ -2535,7 +2586,6 @@ app.get('/api/inventory/name/:itemName', verifyToken, async (req, res) => {
         let item = null;
         let fromCollection = null;
         
-        // Try exact match first in InventoryItem (case-insensitive)
         let inventoryItem = await InventoryItem.findOne({
             $expr: {
                 $eq: [{ $toLower: '$itemName' }, itemName.toLowerCase().trim()]
@@ -2546,7 +2596,6 @@ app.get('/api/inventory/name/:itemName', verifyToken, async (req, res) => {
             item = inventoryItem;
             fromCollection = 'InventoryItem (raw ingredient)';
         } else {
-            // If not found in InventoryItem, try MenuItem (finished products)
             console.log(`   ℹ️  Not found in raw ingredients, searching menu items...`);
             let menuItem = await MenuItem.findOne({
                 $expr: {
@@ -2555,7 +2604,6 @@ app.get('/api/inventory/name/:itemName', verifyToken, async (req, res) => {
             }).lean();
             
             if (!menuItem) {
-                // Try alternate field 'name' in MenuItem
                 menuItem = await MenuItem.findOne({
                     $expr: {
                         $eq: [{ $toLower: '$name' }, itemName.toLowerCase().trim()]
@@ -2607,7 +2655,6 @@ app.get('/api/inventory/name/:itemName', verifyToken, async (req, res) => {
     }
 });
 
-// GET single inventory item
 app.get('/api/inventory/:itemId', verifyToken, async (req, res) => {
     try {
         console.log(`📦 API: Fetching inventory item ${req.params.itemId}...`);
@@ -2648,14 +2695,12 @@ app.get('/api/inventory/:itemId', verifyToken, async (req, res) => {
     }
 });
 
-// CREATE new inventory item (raw ingredient)
 app.post('/api/inventory', verifyToken, verifyAdmin, async (req, res) => {
     try {
         console.log('📦 API: Creating new inventory item...', JSON.stringify(req.body, null, 2));
         
         const { itemName, category, unit, currentStock, minStock, maxStock, itemType } = req.body;
         
-        // Validation
         if (!itemName) {
             return res.status(400).json({
                 success: false,
@@ -2670,7 +2715,6 @@ app.post('/api/inventory', verifyToken, verifyAdmin, async (req, res) => {
             });
         }
         
-        // CHECK FOR DUPLICATE ITEMS (SERVER-SIDE)
         const existingItem = await InventoryItem.findOne({
             itemName: { $regex: `^${itemName.trim()}$`, $options: 'i' }
         });
@@ -2716,7 +2760,6 @@ app.post('/api/inventory', verifyToken, verifyAdmin, async (req, res) => {
         
         console.log(`✅ Inventory item created: ${inventoryItem._id}`);
         
-        // Broadcast real-time update
         RealTimeManager.broadcastToAdmins({
             type: 'inventory_update',
             action: 'created',
@@ -2739,7 +2782,6 @@ app.post('/api/inventory', verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
-// UPDATE inventory item
 app.put('/api/inventory/:itemId', verifyToken, verifyAdmin, async (req, res) => {
     try {
         console.log(`📦 API: Updating inventory item ${req.params.itemId}...`, JSON.stringify(req.body, null, 2));
@@ -2747,7 +2789,6 @@ app.put('/api/inventory/:itemId', verifyToken, verifyAdmin, async (req, res) => 
         const { itemName, category, unit, currentStock, minStock, maxStock, itemType } = req.body;
         const itemId = req.params.itemId;
         
-        // CHECK FOR DUPLICATE ITEMS (excluding current item)
         if (itemName) {
             const existingItem = await InventoryItem.findOne({
                 _id: { $ne: itemId },
@@ -2805,14 +2846,12 @@ app.put('/api/inventory/:itemId', verifyToken, verifyAdmin, async (req, res) => 
         
         console.log(`✅ Inventory item updated: ${inventoryItem._id}`);
         
-        // Broadcast real-time update to admins and staff
         RealTimeManager.broadcastToAdmins({
             type: 'inventory_update',
             action: 'updated',
             item: formatted
         });
         
-        // Also broadcast to staff for stock notifications
         RealTimeManager.broadcastToStaff({
             type: 'inventory_update',
             action: 'stock_changed',
@@ -2822,7 +2861,6 @@ app.put('/api/inventory/:itemId', verifyToken, verifyAdmin, async (req, res) => 
             isLowStock: parsedCurrentStock > 0 && parsedCurrentStock <= parsedMinStock
         });
         
-        // Update related menu items based on inventory availability
         console.log(`🍽️ Checking affected menu items for "${itemName}"...`);
         await RecipeManager.updateRelatedMenuItems(itemName);
         
@@ -2842,7 +2880,6 @@ app.put('/api/inventory/:itemId', verifyToken, verifyAdmin, async (req, res) => 
     }
 });
 
-// DELETE inventory item
 app.delete('/api/inventory/:itemId', verifyToken, verifyAdmin, async (req, res) => {
     try {
         console.log(`📦 API: Deleting inventory item ${req.params.itemId}...`);
@@ -2858,7 +2895,6 @@ app.delete('/api/inventory/:itemId', verifyToken, verifyAdmin, async (req, res) 
         
         console.log(`✅ Inventory item deleted: ${req.params.itemId}`);
         
-        // Broadcast real-time update
         RealTimeManager.broadcastToAdmins({
             type: 'inventory_update',
             action: 'deleted',
@@ -2879,7 +2915,6 @@ app.delete('/api/inventory/:itemId', verifyToken, verifyAdmin, async (req, res) 
     }
 });
 
-// GET out-of-stock items (for notifications)
 app.get('/api/inventory/status/out-of-stock', verifyToken, async (req, res) => {
     try {
         console.log('🚨 API: Fetching out-of-stock items...');
@@ -2910,7 +2945,6 @@ app.get('/api/inventory/status/out-of-stock', verifyToken, async (req, res) => {
     }
 });
 
-// GET low-stock items (for warnings)
 app.get('/api/inventory/status/low-stock', verifyToken, async (req, res) => {
     try {
         console.log('⚠️ API: Fetching low-stock items...');
@@ -2946,14 +2980,10 @@ app.get('/api/inventory/status/low-stock', verifyToken, async (req, res) => {
     }
 });
 
-// ==================== VIEW ROUTES ====================
-
-// Redirect /admindashboard to /admindashboard/dashboard
 app.get("/admindashboard", verifyToken, verifyAdmin, (req, res) => {
     res.redirect("/admindashboard/dashboard");
 });
 
-// Dashboard view
 app.get("/admindashboard/dashboard", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const currentTime = new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
@@ -2978,9 +3008,6 @@ app.get("/admindashboard/dashboard", verifyToken, verifyAdmin, async (req, res) 
     }
 });
 
-// =========== ADMIN NAVIGATION ROUTES ===========
-
-// Inventory view
 app.get("/admindashboard/inventory", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const [totalItems, lowStockCount, outOfStockCount] = await Promise.all([
@@ -3029,7 +3056,6 @@ app.get("/admindashboard/inventory", verifyToken, verifyAdmin, async (req, res) 
     }
 });
 
-// Sales and Reports view
 app.get("/admindashboard/salesandreports", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const stats = await DashboardStats.getStats();
@@ -3050,7 +3076,6 @@ app.get("/admindashboard/salesandreports", verifyToken, verifyAdmin, async (req,
     }
 });
 
-// Order History view
 app.get("/admindashboard/orderhistory", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const stats = await DashboardStats.getStats();
@@ -3069,7 +3094,6 @@ app.get("/admindashboard/orderhistory", verifyToken, verifyAdmin, async (req, re
     }
 });
 
-// Add Staff view
 app.get("/admindashboard/addstaff", verifyToken, verifyAdmin, (req, res) => {
     res.render("addstaff", {
         user: req.user,
@@ -3077,7 +3101,6 @@ app.get("/admindashboard/addstaff", verifyToken, verifyAdmin, (req, res) => {
     });
 });
 
-// Menu Management view
 app.get("/admindashboard/menumanagement", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const [menuItems, categories, stats] = await Promise.all([
@@ -3105,17 +3128,68 @@ app.get("/admindashboard/menumanagement", verifyToken, verifyAdmin, async (req, 
     }
 });
 
-// ==================== INFOSETTINGS API ENDPOINT ====================
-// Get current user data for settings page
 app.get('/api/infosettings/user', verifyToken, async (req, res) => {
     try {
-        const user = await User.findById(req.user._id).select('-password');
+        console.log('📝 API: /api/infosettings/user - Fetching user data');
+        console.log('Token decoded user:', req.user);
+        
+        // Get the user ID from the token (could be _id or id)
+        const userId = req.user._id || req.user.id || req.user.userId;
+        
+        if (!userId) {
+            console.error('❌ No user ID found in token:', req.user);
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid token: No user ID'
+            });
+        }
+        
+        const user = await User.findById(userId).select('-password');
         
         if (!user) {
+            console.warn(`⚠️ User not found with ID: ${userId}`);
             return res.status(404).json({
                 success: false,
                 message: 'User not found'
             });
+        }
+        
+        console.log(`✅ User found: ${user.username}`);
+        
+        res.json({
+            success: true,
+            data: {
+                _id: user._id,
+                username: user.username,
+                email: user.email,
+                fullName: user.fullName || user.name || user.username,
+                phone: user.phone || '',
+                name: user.name || user.username,
+                role: user.role,
+                createdAt: user.createdAt
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error fetching user data:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching user data',
+            error: error.message
+        });
+    }
+});
+
+// Alternative user endpoints for compatibility
+app.get('/api/user/profile', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id || req.user.userId;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Invalid token' });
+        }
+        
+        const user = await User.findById(userId).select('-password');
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
         }
         
         res.json({
@@ -3124,22 +3198,178 @@ app.get('/api/infosettings/user', verifyToken, async (req, res) => {
                 _id: user._id,
                 username: user.username,
                 email: user.email,
-                fullName: user.fullName || user.username,
+                fullName: user.fullName || user.name || user.username,
                 phone: user.phone || '',
-                role: user.role,
-                createdAt: user.createdAt
+                role: user.role
             }
         });
     } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('Error fetching user profile:', error);
+        res.status(500).json({ success: false, message: 'Error fetching profile' });
+    }
+});
+
+// Update user profile
+app.post('/api/infosettings/update', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id || req.user.userId;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Invalid token' });
+        }
+        
+        const { fullName, email, phoneNumber } = req.body;
+        
+        if (!fullName || !email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Full name and email are required'
+            });
+        }
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid email format'
+            });
+        }
+        
+        const user = await User.findByIdAndUpdate(
+            userId,
+            {
+                fullName: fullName,
+                name: fullName,
+                email: email,
+                phone: phoneNumber || user.phone
+            },
+            { new: true, runValidators: false }
+        ).select('-password');
+        
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+        
+        console.log(`✅ User profile updated: ${user.username}`);
+        
+        res.json({
+            success: true,
+            message: 'Profile updated successfully',
+            data: {
+                _id: user._id,
+                username: user.username,
+                email: user.email,
+                fullName: user.fullName || user.name,
+                phoneNumber: user.phone,
+                updatedAt: user.updatedAt
+            }
+        });
+    } catch (error) {
+        console.error('Error updating user profile:', error);
         res.status(500).json({
             success: false,
-            message: 'Error fetching user data'
+            message: 'Error updating profile',
+            error: error.message
         });
     }
 });
 
-// Settings view
+// Change password
+app.post('/api/infosettings/change-password', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id || req.user.userId;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Invalid token' });
+        }
+        
+        const { currentPassword, newPassword } = req.body;
+        
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'Current password and new password are required'
+            });
+        }
+        
+        if (newPassword.length < 8) {
+            return res.status(400).json({
+                success: false,
+                message: 'New password must be at least 8 characters'
+            });
+        }
+        
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+        
+        // Verify current password
+        const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({
+                success: false,
+                message: 'Current password is incorrect'
+            });
+        }
+        
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        
+        // Update password
+        user.password = hashedPassword;
+        await user.save();
+        
+        console.log(`✅ Password changed for user: ${user.username}`);
+        
+        res.json({
+            success: true,
+            message: 'Password changed successfully'
+        });
+    } catch (error) {
+        console.error('Error changing password:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error changing password',
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/user', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id || req.user.userId;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Invalid token' });
+        }
+        
+        const user = await User.findById(userId).select('-password');
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        
+        res.json({
+            success: true,
+            data: {
+                _id: user._id,
+                username: user.username,
+                email: user.email,
+                fullName: user.fullName || user.name || user.username,
+                phone: user.phone || '',
+                role: user.role
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching user:', error);
+        res.status(500).json({ success: false, message: 'Error fetching user' });
+    }
+});
+
 app.get("/admindashboard/infosettings", verifyToken, verifyAdmin, (req, res) => {
     res.render("infosettings", {
         user: req.user,
@@ -3147,7 +3377,10 @@ app.get("/admindashboard/infosettings", verifyToken, verifyAdmin, (req, res) => 
     });
 });
 
-// Stock view
+app.get("/admindashboard/settings", verifyToken, verifyAdmin, (req, res) => {
+    res.redirect("/admindashboard/infosettings");
+});
+
 app.get("/admindashboard/stock", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const [lowStockItems, outOfStockItems, stats] = await Promise.all([
@@ -3185,7 +3418,6 @@ app.get("/admindashboard/stock", verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
-// Recipes view
 app.get("/admindashboard/recipes", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const sampleIngredients = Object.keys(recipeMapping).slice(0, 20);
@@ -3215,7 +3447,6 @@ app.get("/admindashboard/recipes", verifyToken, verifyAdmin, async (req, res) =>
     }
 });
 
-// Customers view
 app.get("/admindashboard/customers", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const [customers, stats] = await Promise.all([
@@ -3240,9 +3471,6 @@ app.get("/admindashboard/customers", verifyToken, verifyAdmin, async (req, res) 
     }
 });
 
-// =========== END ADMIN NAVIGATION ROUTES ===========
-
-// Staff Dashboard view
 app.get("/staffdashboard", verifyToken, async (req, res) => {
     try {
         if (req.user.role === "admin") {
@@ -3275,7 +3503,6 @@ app.get("/staffdashboard", verifyToken, async (req, res) => {
     }
 });
 
-// Request Stocks page
 app.get("/requeststocks", verifyToken, async (req, res) => {
     try {
         if (req.user.role === "admin") {
@@ -3302,7 +3529,6 @@ app.get("/requeststocks", verifyToken, async (req, res) => {
     }
 });
 
-// ==================== AUTHENTICATION ROUTES ====================
 app.post("/register", async (req, res) => {
     try {
         const referer = req.headers.referer || req.headers.referrer;
@@ -3402,7 +3628,6 @@ app.post("/login", async (req, res) => {
     }
 });
 
-// Helper method to render toast messages
 const renderToast = (message, type = 'info', redirectUrl = null) => {
     const bgColor = type === 'error' ? '#f8d7da' : type === 'success' ? '#d4edda' : '#d1ecf1';
     const borderColor = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#0c5460';
@@ -3443,9 +3668,6 @@ const renderToast = (message, type = 'info', redirectUrl = null) => {
     `;
 };
 
-// ==================== STOCK REQUEST ENDPOINTS ====================
-
-// POST - Create a new stock request from staff
 app.post("/api/stock-requests", verifyToken, async (req, res) => {
     try {
         console.log('📡 Stock request received. Body:', JSON.stringify(req.body, null, 2));
@@ -3453,7 +3675,6 @@ app.post("/api/stock-requests", verifyToken, async (req, res) => {
         
         console.log('🔍 Before parsing - requestedQuantity:', requestedQuantity, 'Type:', typeof requestedQuantity);
         
-        // Ensure requestedQuantity is a number
         if (requestedQuantity !== null && requestedQuantity !== undefined) {
             requestedQuantity = Number(requestedQuantity);
         }
@@ -3461,7 +3682,6 @@ app.post("/api/stock-requests", verifyToken, async (req, res) => {
         console.log('🔍 After parsing - requestedQuantity:', requestedQuantity, 'Type:', typeof requestedQuantity);
         console.log('✓ Extracted fields:', { productName, requestedQuantity, unit, priority, isNaN: isNaN(requestedQuantity) });
         
-        // Validate required fields
         if (!productName || productName.trim() === '') {
             console.error('❌ Missing productName:', productName);
             return res.status(400).json({ 
@@ -3489,19 +3709,15 @@ app.post("/api/stock-requests", verifyToken, async (req, res) => {
             });
         }
         
-        // ==================== FAST PATH: Use productName as unique identifier ====================
-        // Check for existing pending request by productName (much faster than searching by ID)
         const existingPendingRequest = await StockRequest.findOne({
             productName: productName,
             status: 'pending'
         });
         
         if (existingPendingRequest) {
-            // Allow re-requesting if the existing request is older than 24 hours
             const hoursOld = (Date.now() - new Date(existingPendingRequest.requestDate)) / (1000 * 60 * 60);
             
             if (hoursOld < 24) {
-                // Update existing pending request with new quantity instead of rejecting
                 console.log(`🔄 Updating existing pending request for: ${productName} (${hoursOld.toFixed(1)} hours old)`);
                 console.log(`📝 Old quantity: ${existingPendingRequest.requestedQuantity}, New quantity: ${requestedQuantity}`);
                 
@@ -3517,13 +3733,11 @@ app.post("/api/stock-requests", verifyToken, async (req, res) => {
                     hoursOld: hoursOld
                 });
             } else {
-                // Auto-remove stale pending request (> 24 hours old)
                 console.log(`🗑️ Removing stale stock request for: ${productName} (${hoursOld.toFixed(1)} hours old)`);
                 await StockRequest.deleteOne({ _id: existingPendingRequest._id });
             }
         }
         
-        // Create stock request with valid productId
         console.log('📦 Creating StockRequest object with:', {
             productName,
             requestedQuantity,
@@ -3531,7 +3745,6 @@ app.post("/api/stock-requests", verifyToken, async (req, res) => {
             priority: priority || 'medium'
         });
         
-        // Build the request object - productId is optional
         const requestObj = {
             productName: productName.trim(),
             requestedQuantity: requestedQuantity,
@@ -3542,7 +3755,6 @@ app.post("/api/stock-requests", verifyToken, async (req, res) => {
             requestDate: new Date()
         };
         
-        // Only set productId if it's provided and not empty
         if (productId && productId.trim) {
             productId = productId.trim();
         }
@@ -3559,7 +3771,6 @@ app.post("/api/stock-requests", verifyToken, async (req, res) => {
         await stockRequest.save();
         console.log(`✅ Stock request SAVED to MongoDB: ${productName} x${requestedQuantity} - ID: ${stockRequest._id}`);
         
-        // ==================== BROADCAST NOTIFICATION TO MENU MANAGEMENT ====================
         const notification = {
             type: 'stock_request',
             title: `📦 Stock Request from Staff`,
@@ -3574,7 +3785,6 @@ app.post("/api/stock-requests", verifyToken, async (req, res) => {
             data: stockRequest
         };
         
-        // Broadcast to all admin connections
         RealTimeManager.broadcastToAdmins(notification);
         console.log(`📢 Notification broadcasted: Stock request for ${productName}`);
         
@@ -3588,7 +3798,6 @@ app.post("/api/stock-requests", verifyToken, async (req, res) => {
         console.error("Error type:", error.constructor.name);
         console.error("Stack trace:", error.stack);
         
-        // Check if it's a Mongoose validation error
         if (error.name === 'ValidationError') {
             const validationErrors = Object.entries(error.errors).map(([field, err]) => ({
                 field,
@@ -3604,7 +3813,6 @@ app.post("/api/stock-requests", verifyToken, async (req, res) => {
             });
         }
         
-        // Check if it's a duplicate key error
         if (error.code === 11000) {
             console.error('🔴 Duplicate key error:', error.keyPattern);
             return res.status(400).json({
@@ -3614,7 +3822,6 @@ app.post("/api/stock-requests", verifyToken, async (req, res) => {
             });
         }
         
-        // Generic server error
         res.status(500).json({
             success: false,
             message: "Failed to create stock request",
@@ -3624,7 +3831,6 @@ app.post("/api/stock-requests", verifyToken, async (req, res) => {
     }
 });
 
-// ==================== ✅ FULFILL STOCK REQUEST ====================
 app.post("/api/stock-requests/fulfill", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const { notificationId, productId, productName, quantity, unit, newStock } = req.body;
@@ -3635,7 +3841,6 @@ app.post("/api/stock-requests/fulfill", verifyToken, verifyAdmin, async (req, re
         console.log(`New Stock: ${newStock}`);
         console.log(`================================================\n`);
         
-        // Validation
         if (!productName || !quantity || quantity <= 0) {
             console.error(`❌ Validation failed: Invalid productName or quantity`);
             return res.status(400).json({
@@ -3644,7 +3849,6 @@ app.post("/api/stock-requests/fulfill", verifyToken, verifyAdmin, async (req, re
             });
         }
         
-        // Find the stock request by product name
         const stockRequest = await StockRequest.findOne({
             productName: productName,
             status: 'pending'
@@ -3658,7 +3862,6 @@ app.post("/api/stock-requests/fulfill", verifyToken, verifyAdmin, async (req, re
             });
         }
         
-        // Update the stock request status
         stockRequest.status = 'fulfilled';
         stockRequest.fulfilledDate = new Date();
         stockRequest.fulfilledQuantity = quantity;
@@ -3666,7 +3869,6 @@ app.post("/api/stock-requests/fulfill", verifyToken, verifyAdmin, async (req, re
         await stockRequest.save();
         console.log(`✅ Stock request marked as fulfilled`);
         
-        // Update menu item stock
         try {
             const menuItem = await MenuItem.findOne({
                 $or: [
@@ -3678,7 +3880,6 @@ app.post("/api/stock-requests/fulfill", verifyToken, verifyAdmin, async (req, re
             
             if (menuItem) {
                 const oldStock = menuItem.currentStock || 0;
-                // SET the stock to the requested quantity (not add to it)
                 menuItem.currentStock = quantity;
                 await menuItem.save();
                 console.log(`✅ Updated menu item stock: ${oldStock} → ${menuItem.currentStock} (SET to requested quantity)`);
@@ -3689,7 +3890,6 @@ app.post("/api/stock-requests/fulfill", verifyToken, verifyAdmin, async (req, re
             console.error(`❌ Error updating menu item stock:`, menuUpdateError.message);
         }
         
-        // ==================== 📢 BROADCAST STOCK UPDATE TO STAFF DASHBOARD ====================
         const stockUpdateNotification = {
             type: 'stock_fulfilled',
             title: `📦 Stock Request Fulfilled`,
@@ -3703,7 +3903,6 @@ app.post("/api/stock-requests/fulfill", verifyToken, verifyAdmin, async (req, re
             data: stockRequest
         };
         
-        // Broadcast to all staff connections
         RealTimeManager.broadcastToStaff(stockUpdateNotification);
         console.log(`📢 Stock fulfilled notification broadcasted to staff: ${productName}`);
         
@@ -3729,12 +3928,11 @@ app.post("/api/stock-requests/fulfill", verifyToken, verifyAdmin, async (req, re
     }
 });
 
-// ==================== 🔧 ADMIN DEBUG: Clear old pending stock requests ====================
 app.delete("/api/stock-requests/clear-old-pending", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const result = await StockRequest.deleteMany({
             status: 'pending',
-            requestDate: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Older than 24 hours
+            requestDate: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) }
         });
         
         res.status(200).json({
@@ -3752,7 +3950,6 @@ app.delete("/api/stock-requests/clear-old-pending", verifyToken, verifyAdmin, as
     }
 });
 
-// ==================== 🔧 ADMIN DEBUG: Clear ALL pending stock requests ====================
 app.delete("/api/stock-requests/clear-all-pending", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const result = await StockRequest.deleteMany({
@@ -3776,7 +3973,6 @@ app.delete("/api/stock-requests/clear-all-pending", verifyToken, verifyAdmin, as
     }
 });
 
-// ==================== 🔧 ADMIN DEBUG: Get all pending requests ====================
 app.get("/api/stock-requests/debug/pending-list", async (req, res) => {
     try {
         const pendingRequests = await StockRequest.find({ status: 'pending' }).sort({ requestDate: -1 });
@@ -3802,7 +3998,6 @@ app.get("/api/stock-requests/debug/pending-list", async (req, res) => {
     }
 });
 
-// ==================== 🔧 ADMIN DEBUG: Delete specific pending request ====================
 app.delete("/api/stock-requests/debug/pending/:productName", async (req, res) => {
     try {
         const result = await StockRequest.deleteOne({
@@ -3833,7 +4028,6 @@ app.delete("/api/stock-requests/debug/pending/:productName", async (req, res) =>
     }
 });
 
-// GET - Fetch all pending stock requests
 app.get("/api/stock-requests/pending", verifyToken, async (req, res) => {
     try {
         const pendingRequests = await StockRequest.find({ status: 'pending' })
@@ -3854,10 +4048,8 @@ app.get("/api/stock-requests/pending", verifyToken, async (req, res) => {
     }
 });
 
-// GET - Fetch all stock requests
 app.get("/api/stock-requests", verifyToken, async (req, res) => {
     try {
-        // Support filtering by status: ?status=pending
         const query = {};
         if (req.query.status) {
             query.status = req.query.status;
@@ -3885,7 +4077,6 @@ app.get("/api/stock-requests", verifyToken, async (req, res) => {
     }
 });
 
-// PUT - Update stock request status (approve/reject/fulfill)
 app.put("/api/stock-requests/:id", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const { id } = req.params;
@@ -3911,7 +4102,6 @@ app.put("/api/stock-requests/:id", verifyToken, verifyAdmin, async (req, res) =>
         
         console.log(`✅ Stock request updated: ${stockRequest.productName} - Status: ${status}`);
         
-        // ==================== BROADCAST TO STAFF IF FULFILLED ====================
         if (status === 'fulfilled') {
             const notification = {
                 type: 'stock_request_fulfilled',
@@ -3924,7 +4114,6 @@ app.put("/api/stock-requests/:id", verifyToken, verifyAdmin, async (req, res) =>
                 timestamp: new Date()
             };
             
-            // Broadcast to all staff connections
             RealTimeManager.broadcastToStaff(notification);
             console.log(`📢 Fulfillment notification broadcasted: ${stockRequest.productName}`);
         }
@@ -3944,7 +4133,6 @@ app.put("/api/stock-requests/:id", verifyToken, verifyAdmin, async (req, res) =>
     }
 });
 
-// DELETE - Delete a stock request
 app.delete("/api/stock-requests/:id", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const { id } = req.params;
@@ -3972,14 +4160,12 @@ app.delete("/api/stock-requests/:id", verifyToken, verifyAdmin, async (req, res)
     }
 });
 
-// ==================== OTHER ROUTES ====================
 app.get('/images/default_food.jpg', (req, res) => {
     res.sendFile(path.join(__dirname, 'images', 'default_food.png'));
 });
 
 app.get("/logout", (req, res) => {
     res.clearCookie("token");
-    // Redirect with logout parameter so client can clear sessionStorage
     res.redirect("/login?logout=true");
 });
 
@@ -3987,40 +4173,29 @@ app.get('/login', (req, res) => {
     res.render('login', { businessInfo: BUSINESS_INFO });
 });
 
-// ==================== 🔐 ROOT ROUTE - SMART REDIRECT ====================
-// Redirect root to appropriate dashboard or login based on JWT token
 app.get('/', (req, res) => {
     const token = req.cookies.token;
     
     if (!token) {
-        // No token, send to login
         return res.redirect('/login');
     }
     
     try {
-        // Verify the token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         
-        // Token is valid, redirect to appropriate dashboard based on role
         if (decoded.role === 'admin') {
             return res.redirect('/admindashboard/dashboard');
         } else {
             return res.redirect('/staffdashboard');
         }
     } catch (error) {
-        // Token is invalid or expired, send to login
         res.clearCookie("token");
         return res.redirect('/login');
     }
 });
 
-
-// ==================== STORE CONNECTED STAFF CLIENTS ====================
 let staffClients = [];
 
-// ==================== ADMIN EMIT STOCK TRANSFER ENDPOINT ====================
-
-// ==================== NOTIFY ADMIN OF OUT OF STOCK ====================
 app.post('/api/admin/notify-out-of-stock', verifyToken, async (req, res) => {
     try {
         const { productName, productId, timestamp, notifiedFrom } = req.body;
@@ -4029,7 +4204,6 @@ app.post('/api/admin/notify-out-of-stock', verifyToken, async (req, res) => {
         console.log(`   Notified by: ${notifiedFrom}`);
         console.log(`   Timestamp: ${timestamp}`);
         
-        // Broadcast notification to all admin clients
         const notification = {
             type: 'out_of_stock_alert',
             severity: 'critical',
@@ -4057,16 +4231,11 @@ app.post('/api/admin/notify-out-of-stock', verifyToken, async (req, res) => {
     }
 });
 
-// ==================== STAFF INVENTORY RECEIVE ENDPOINT ====================
 app.post('/api/staff/inventory/receive', async (req, res) => {
     try {
         const transferData = req.body;
         console.log('📦 Direct staff inventory update:', transferData);
         
-        // Here you would update your database
-        // This is a direct API call to update staff inventory
-        
-        // Also broadcast to SSE clients
         let sentCount = 0;
         staffClients.forEach(client => {
             try {
@@ -4088,17 +4257,11 @@ app.post('/api/staff/inventory/receive', async (req, res) => {
     }
 });
 
-// ==================== WEBSOCKET SERVER SETUP ====================
-// Note: WebSocketServer will be attached to HTTP server after it's created
-// (See server startup section at the end of the file)
-
-// ==================== EMIT STOCK TRANSFER EVENT TO STAFF ====================
 app.post('/api/admin/emit-stock-transfer', async (req, res) => {
     try {
         const transferData = req.body;
         console.log('📡 Emitting stock transfer event to staff:', transferData);
         
-        // Create notification object
         const notification = {
             type: 'stock_transfer',
             action: 'stock_received',
@@ -4111,7 +4274,6 @@ app.post('/api/admin/emit-stock-transfer', async (req, res) => {
             transferredBy: transferData.transferredBy
         };
         
-        // ==================== BROADCAST TO ALL STAFF CLIENTS VIA SSE ====================
         RealTimeManager.broadcastToStaff(notification);
         console.log(`✅ Stock transfer broadcasted to all staff: ${transferData.itemName} x${transferData.quantitySent}`);
         
@@ -4122,20 +4284,205 @@ app.post('/api/admin/emit-stock-transfer', async (req, res) => {
     }
 });
 
-// ==================== START SERVER ====================
 const server = http.createServer(app);
 
-// Attach WebSocket to the HTTP server
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-// Store connected staff WebSocket clients
 const staffWebSocketConnections = new Set();
+
+// ======================== NOTIFICATION ENDPOINTS ========================
+
+// Send test email to verify Gmail configuration
+app.post('/api/notify/test-email', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const { email } = req.body;
+        
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email address is required'
+            });
+        }
+        
+        console.log(`📧 Sending test email to ${email}...`);
+        
+        const sent = await notificationService.sendTestEmail(email);
+        
+        if (sent) {
+            res.json({
+                success: true,
+                message: 'Test email sent successfully',
+                email: email,
+                timestamp: new Date().toLocaleString('en-PH')
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to send test email. Check server logs for details.'
+            });
+        }
+    } catch (error) {
+        console.error('❌ Error sending test email:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error sending test email',
+            error: error.message
+        });
+    }
+});
+
+// Send profile update notification
+app.post('/api/notify/profile-update', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const user = req.user;
+        const { email, fullName, phone } = req.body;
+        
+        console.log(`📧 Sending profile update email to ${email}...`);
+        
+        const updatedData = {
+            fullName: fullName || user.username,
+            email: email,
+            phone: phone
+        };
+        
+        const emailSent = await notificationService.sendProfileUpdateEmail(email, updatedData);
+        
+        // Try to send SMS if phone number is provided
+        let smsSent = false;
+        if (phone) {
+            smsSent = await notificationService.sendSMSToAdmin(
+                phone,
+                `Hello ${updatedData.fullName}, your profile was updated at ${new Date().toLocaleTimeString('en-PH')}. - G'RAY CAFÉ POS`
+            );
+        }
+        
+        res.json({
+            success: true,
+            message: 'Notifications sent',
+            emailSent: emailSent,
+            smsSent: smsSent,
+            timestamp: new Date().toLocaleString('en-PH')
+        });
+    } catch (error) {
+        console.error('❌ Error sending notification:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error sending notification',
+            error: error.message
+        });
+    }
+});
+
+// Send password change notification
+app.post('/api/notify/password-change', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const user = req.user;
+        const { email, fullName, phone } = req.body;
+        
+        console.log(`📧 Sending password change email to ${email}...`);
+        
+        const emailSent = await notificationService.sendPasswordChangeEmail(email, fullName || user.username);
+        
+        // Try to send SMS if phone number is provided
+        let smsSent = false;
+        if (phone) {
+            smsSent = await notificationService.sendSMSToAdmin(
+                phone,
+                `⚠️ Your password was changed at ${new Date().toLocaleTimeString('en-PH')}. If not you, contact admin immediately. - G'RAY CAFÉ POS`
+            );
+        }
+        
+        res.json({
+            success: true,
+            message: 'Password change notifications sent',
+            emailSent: emailSent,
+            smsSent: smsSent,
+            timestamp: new Date().toLocaleString('en-PH')
+        });
+    } catch (error) {
+        console.error('❌ Error sending password change notification:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error sending password change notification',
+            error: error.message
+        });
+    }
+});
+
+// Generic email endpoint
+app.post('/api/notify/send-email', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const { email, subject, htmlContent } = req.body;
+        
+        if (!email || !subject || !htmlContent) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email, subject, and content are required'
+            });
+        }
+        
+        console.log(`📧 Sending custom email to ${email}...`);
+        
+        const sent = await notificationService.sendEmailToAdmin(email, subject, htmlContent);
+        
+        if (sent) {
+            res.json({
+                success: true,
+                message: 'Email sent successfully',
+                email: email
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to send email'
+            });
+        }
+    } catch (error) {
+        console.error('❌ Error sending custom email:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error sending email',
+            error: error.message
+        });
+    }
+});
+
+// Generic SMS endpoint
+app.post('/api/notify/send-sms', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const { phone, message } = req.body;
+        
+        if (!phone || !message) {
+            return res.status(400).json({
+                success: false,
+                message: 'Phone number and message are required'
+            });
+        }
+        
+        console.log(`📱 Sending SMS to ${phone}...`);
+        
+        const sent = await notificationService.sendSMSToAdmin(phone, message);
+        
+        res.json({
+            success: true,
+            message: 'SMS notification processed',
+            phone: phone,
+            sent: sent
+        });
+    } catch (error) {
+        console.error('❌ Error sending SMS:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error sending SMS',
+            error: error.message
+        });
+    }
+});
 
 wss.on('connection', (ws, req) => {
     const url = req.url;
     
     if (url.includes('/ws/staff')) {
-        // Staff WebSocket connection
         staffWebSocketConnections.add(ws);
         console.log(`✅ Staff WebSocket connected. Total: ${staffWebSocketConnections.size}`);
         
@@ -4155,7 +4502,6 @@ wss.on('connection', (ws, req) => {
     }
     
     if (url.includes('/ws/admin')) {
-        // Admin WebSocket connection
         console.log('✅ Admin WebSocket connected');
         
         ws.on('close', () => {

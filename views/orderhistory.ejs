@@ -51,41 +51,6 @@
       <h1><i class="fas fa-history"></i> Order History</h1>
     </div>
 
-    <div class="orders-container">
-      
-      <div class="no-orders" id="noOrdersMessage">
-        <i class="fas fa-clipboard-list fa-3x"></i>
-      </div>
-
-      <table class="orders-table" id="ordersTable" style="display: none;">
-        <thead>
-          <tr>
-            <th>Order ID</th>
-            <th>Customer</th>
-            <th>Items</th>
-            <th>Total Amount</th>
-            <th>Status</th>
-            <th>Date & Time</th>
-            <th>Payment Method</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="ordersTableBody">
-         
-        </tbody>
-      </table>
-    </div>
-
-    <div class="pagination" id="pagination" style="display: none;">
-      <button class="pagination-btn" onclick="changePage(-1)">
-        <i class="fas fa-chevron-left"></i> Previous
-      </button>
-      <span class="page-info">Page <span id="currentPage">1</span> of <span id="totalPages">1</span></span>
-      <button class="pagination-btn" onclick="changePage(1)">
-        Next <i class="fas fa-chevron-right"></i>
-      </button>
-    </div>
-
           <div class="chart-card">
             <div class="table-header">
               <h3>Top Selling Items</h3>
@@ -109,7 +74,7 @@
             <div class="table-header">
               <div>
                 <h3>Inventory Status</h3>
-                <p style="font-size: 12px; color: #999; margin-top: 4px;">Low Stock & Out of Stock Items</p>
+                <p style="font-size: 12px; color: #999; margin-top: 4px;">All Inventory Items</p>
               </div>
             </div>
             <table>
