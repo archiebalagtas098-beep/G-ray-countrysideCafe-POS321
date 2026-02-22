@@ -2828,6 +2828,47 @@ async function saveMenuItem(itemData) {
             
             if (!isEdit) {
                 console.log(`✅ Product "${itemData.itemName}" created successfully`);
+                
+                // 🧂 DEDUCT RAW INGREDIENTS FROM INVENTORY
+                console.log(`🧂 Deducting ingredients for: ${itemData.itemName}`);
+                try {
+                    const deductResponse = await fetch('/api/inventory/deduct-ingredients', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            itemName: itemData.itemName,
+                            quantity: 1, // 1 unit of product created
+                            reason: 'Product created in menu'
+                        }),
+                        credentials: 'include'
+                    });
+                    
+                    if (deductResponse.ok) {
+                        const deductData = await deductResponse.json();
+                        console.log(`✅ Ingredients deducted:`, deductData);
+                        
+                        // Check if any ingredients were deducted
+                        if (deductData.deductedIngredients && deductData.deductedIngredients.length > 0) {
+                            const ingredientsList = deductData.deductedIngredients
+                                .map(ing => `${ing.ingredient} (-${ing.quantity} ${ing.unit})`)
+                                .join(', ');
+                            showToast(`✅ Ingredients deducted: ${ingredientsList}`, 'success');
+                        } else {
+                            // No ingredients found - product not in recipe mapping
+                            console.warn(`⚠️ Product "${itemData.itemName}" not found in recipe mapping`);
+                            showToast(`⚠️ Note: Recipe not defined for "${itemData.itemName}"\nIngredients will not auto-deduct.\nAdd recipe in server.js recipeMapping to enable deduction.`, 'warning');
+                        }
+                    } else {
+                        console.warn(`⚠️ Could not deduct ingredients - endpoint error`);
+                        showToast(`⚠️ Ingredient deduction unavailable`, 'warning');
+                    }
+                } catch (deductError) {
+                    console.warn(`⚠️ Ingredient deduction error:`, deductError.message);
+                    // Don't block product creation if deduction fails
+                }
             }
             
             saveInventoryStockValues();

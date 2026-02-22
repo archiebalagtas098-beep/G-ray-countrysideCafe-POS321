@@ -223,7 +223,17 @@ const recipeMapping = {
     ],
     'Egg': [
         'Sizzling Pork Sisig',
-        'Fried Rice'
+        'Fried Rice',
+        'Fried Chicken',
+        'Budget Fried Chicken',
+        'Cream Dory Fish Fillet'
+    ],
+    'Eggs': [
+        'Sizzling Pork Sisig',
+        'Fried Rice',
+        'Fried Chicken',
+        'Budget Fried Chicken',
+        'Cream Dory Fish Fillet'
     ],
     'Butter': [
         'Buttered Honey Chicken',
@@ -339,7 +349,9 @@ const recipeMapping = {
         'Sinigang (Pork)',
         'Sinigang (Shrimp)',
         'Paknet (Pakbet w/ Bagnet)',
-        'Buttered Shrimp'
+        'Buttered Shrimp',
+        'Fried Chicken',
+        'Budget Fried Chicken'
     ],
     'Peppercorn': [
         'Korean Salt and Pepper (Pork)'
@@ -616,6 +628,34 @@ const recipeMapping = {
         'Paknet (Pakbet w/ Bagnet)',
         'Buttered Shrimp',
         'Special Bulalo'
+    ],
+    
+    // 🆕 MENU ITEM ALIASES (for items with size/variant suffixes)
+    'Blue Lemonade (Glass)': [
+        'Lemon juice',
+        'Blue syrup',
+        'Paper cups',
+        'Straws'
+    ],
+    'Pancit Bihon (L)': [
+        'Garlic',
+        'Onion',
+        'Carrot',
+        'Rice noodles',
+        'Soy sauce',
+        'Oyster sauce',
+        'Cooking oil',
+        'Salt',
+        'Black pepper'
+    ],
+    'Matcha Green Tea HC': [
+        'Matcha powder',
+        'Tea',
+        'Tapioca pearls',
+        'Milk',
+        'Sugar',
+        'Paper cups',
+        'Straws'
     ]
 };
 
@@ -1239,6 +1279,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/images', express.static(path.join(__dirname, "images")));
+
+// ==================== FAVICON HANDLER ====================
+app.get('/favicon.ico', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'favicon.ico'));
+});
 
 app.set("view engine", "ejs");
 app.set('views', path.join(__dirname, 'views'));
@@ -1883,8 +1928,13 @@ app.get("/api/inventory", verifyToken, async (req, res) => {
 
 app.get("/api/orders/today", verifyToken, verifyAdmin, async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit) || 5;
+        // ✅ Default to 20 orders, max 100 for performance
+        let limit = parseInt(req.query.limit) || 20;
+        limit = Math.min(limit, 100); // Cap at 100
+        
         const { startOfDay, endOfDay } = HelperFunctions.getTodayDateRange();
+        
+        console.log(`📋 Fetching up to ${limit} orders for today...`);
         
         let orders = await Order.find({ 
             status: 'completed',
@@ -1894,7 +1944,10 @@ app.get("/api/orders/today", verifyToken, verifyAdmin, async (req, res) => {
         .limit(limit)
         .lean();
         
+        console.log(`📊 Found ${orders.length} completed orders today`);
+        
         if (orders.length === 0) {
+            console.log('⚠️ No orders today, fetching from last 7 days...');
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
             
@@ -1905,6 +1958,8 @@ app.get("/api/orders/today", verifyToken, verifyAdmin, async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(limit)
             .lean();
+            
+            console.log(`📊 Found ${orders.length} orders from last 7 days`);
         }
         
         res.json({
@@ -1921,7 +1976,7 @@ app.get("/api/orders/today", verifyToken, verifyAdmin, async (req, res) => {
     }
 });
 
-app.get("/api/orders/top-items", verifyToken, verifyAdmin, async (req, res) => {
+app.get("/api/orders/top-items", verifyToken, async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 5;
         const days = parseInt(req.query.days) || 30;
@@ -1929,50 +1984,76 @@ app.get("/api/orders/top-items", verifyToken, verifyAdmin, async (req, res) => {
         const dateRange = new Date();
         dateRange.setDate(dateRange.getDate() - days);
         
+        console.log(`📊 Fetching top items: limit=${limit}, days=${days}, dateRange=${dateRange}`);
+        
+        // First, check if there are ANY orders in the system
+        const totalOrders = await Order.countDocuments();
+        const completedOrders = await Order.countDocuments({ status: 'completed' });
+        const recentOrders = await Order.countDocuments({ createdAt: { $gte: dateRange } });
+        
+        console.log(`📋 Order counts: total=${totalOrders}, completed=${completedOrders}, recent(${days}d)=${recentOrders}`);
+        
+        // Get all orders first (regardless of status) to ensure we get data
         const topItems = await Order.aggregate([
             { 
                 $match: { 
-                    status: 'completed',
                     createdAt: { $gte: dateRange }
                 } 
             },
             { $unwind: '$items' },
             { 
                 $group: { 
-                    _id: { 
-                        $cond: [
-                            { $or: [
-                                { $eq: ['$items.name', null] },
-                                { $eq: ['$items.name', ''] },
-                                { $eq: ['$items.name', 'Unknown Item'] }
-                            ]},
-                            '$items.itemName',
-                            '$items.name'
-                        ]
-                    },
+                    _id: '$items.name',
                     totalQuantity: { $sum: '$items.quantity' },
-                    totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } }
+                    totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+                    count: { $sum: 1 }
                 }
             },
+            // Filter out null, empty strings, and "Unknown Item"
             { 
                 $match: { 
-                    _id: { $ne: null, $ne: '', $ne: 'Unknown Item' }
+                    _id: { 
+                        $ne: null, 
+                        $ne: '', 
+                        $ne: 'Unknown Item'
+                    }
                 }
             },
-            { $sort: { totalQuantity: -1 } },
+            { $sort: { totalRevenue: -1 } },
             { $limit: limit }
         ]);
+        
+        console.log(`✅ Top items aggregation returned: ${topItems.length} items`);
+        
+        if (topItems.length > 0) {
+            console.log('📋 Sample top items:', topItems.slice(0, 2).map(i => ({
+                name: i._id,
+                qty: i.totalQuantity,
+                revenue: i.totalRevenue
+            })));
+        } else {
+            console.warn('⚠️ No items found. Checking raw order structure...');
+            const sampleOrder = await Order.findOne();
+            console.log('Sample order structure:', sampleOrder ? {
+                id: sampleOrder._id,
+                status: sampleOrder.status,
+                itemsCount: sampleOrder.items?.length,
+                firstItem: sampleOrder.items?.[0]
+            } : 'No orders in database');
+        }
         
         res.json({
             success: true,
             data: topItems,
-            count: topItems.length
+            count: topItems.length,
+            debug: { totalOrders, completedOrders, recentOrders }
         });
     } catch (error) {
         console.error('❌ Error fetching top selling items:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch top selling items'
+            message: 'Failed to fetch top selling items',
+            error: error.message
         });
     }
 });
@@ -2379,6 +2460,93 @@ app.post('/api/orders', verifyToken, async (req, res) => {
                 }
             } catch (err) {
                 console.error(`❌ Error updating inventory for ${item.name}:`, err.message);
+            }
+        }
+        
+        // 🆕 DEDUCT RAW INGREDIENTS FROM INVENTORY
+        // ENABLED: Deductions happen when orders are placed
+        console.log('🧂 Processing raw ingredient deductions...');
+        console.log(`🧂 DEBUG: reverseRecipeMapping has ${Object.keys(reverseRecipeMapping).length} dishes:`, Object.keys(reverseRecipeMapping).slice(0, 10));
+        
+        for (const item of processedItems) {
+            try {
+                console.log(`🔍 Looking for recipe for item: "${item.name}"`);
+                
+                // Try exact match first, then case-insensitive match
+                let requiredIngredients = reverseRecipeMapping[item.name];
+                
+                if (!requiredIngredients) {
+                    // Try case-insensitive match
+                    const matchedDish = Object.keys(reverseRecipeMapping).find(
+                        dish => dish.toLowerCase() === item.name.toLowerCase()
+                    );
+                    console.log(`   Exact match failed, trying case-insensitive. Found: "${matchedDish}"`);
+                    requiredIngredients = matchedDish ? reverseRecipeMapping[matchedDish] : null;
+                }
+                
+                if (!requiredIngredients || requiredIngredients.length === 0) {
+                    console.log(`ℹ️ No ingredients required for: ${item.name}`);
+                    continue;
+                }
+                
+                console.log(`🔗 Deducting ingredients for: ${item.name} (Qty: ${item.quantity}) | Required: [${requiredIngredients.join(', ')}]`);
+                
+                for (const ingredientName of requiredIngredients) {
+                    try {
+                        // Try exact match first
+                        let inventoryItem = await InventoryItem.findOne({
+                            itemName: { $regex: new RegExp(`^${ingredientName}$`, 'i') },
+                            itemType: 'raw',
+                            isActive: true
+                        });
+                        
+                        // If not found, try partial match (in case of naming variations)
+                        if (!inventoryItem) {
+                            inventoryItem = await InventoryItem.findOne({
+                                itemName: { $regex: new RegExp(ingredientName, 'i') },
+                                itemType: 'raw',
+                                isActive: true
+                            });
+                        }
+                        
+                        if (!inventoryItem) {
+                            console.warn(`⚠️ Raw ingredient not found in inventory: ${ingredientName}`);
+                            continue;
+                        }
+                        
+                        const quantityToDeduct = item.quantity || 1;
+                        const previousStock = inventoryItem.currentStock;
+                        const newStock = Math.max(0, previousStock - quantityToDeduct);
+                        
+                        // Update stock
+                        inventoryItem.currentStock = newStock;
+                        
+                        // Update status based on new stock level
+                        if (newStock <= 0) {
+                            inventoryItem.status = 'out_of_stock';
+                        } else if (newStock <= inventoryItem.minStock) {
+                            inventoryItem.status = 'low_stock';
+                        } else {
+                            inventoryItem.status = 'in_stock';
+                        }
+                        
+                        // Record usage in history
+                        inventoryItem.usageHistory.push({
+                            quantity: quantityToDeduct,
+                            notes: `Deducted for order #${savedOrder.orderNumber} - ${item.name}`,
+                            usedBy: req.user.username,
+                            date: new Date()
+                        });
+                        
+                        await inventoryItem.save();
+                        
+                        console.log(`  ✓ ${inventoryItem.itemName}: ${previousStock} → ${newStock} ${inventoryItem.unit} [${inventoryItem.status}]`);
+                    } catch (err) {
+                        console.error(`❌ Error deducting ingredient ${ingredientName}:`, err.message);
+                    }
+                }
+            } catch (err) {
+                console.error(`❌ Error processing ingredients for ${item.name}:`, err.message);
             }
         }
         
@@ -2880,6 +3048,110 @@ app.put('/api/inventory/:itemId', verifyToken, verifyAdmin, async (req, res) => 
     }
 });
 
+// 🧂 DEDUCT RAW INGREDIENTS WHEN MENU ITEM IS CREATED
+app.post('/api/inventory/deduct-ingredients', verifyToken, async (req, res) => {
+    try {
+        const { itemName, quantity = 1, reason = 'Product created' } = req.body;
+        
+        if (!itemName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Item name is required'
+            });
+        }
+        
+        console.log(`🧂 API: Deducting ingredients for: ${itemName} (Qty: ${quantity})`);
+        
+        // Get required ingredients for this menu item
+        const requiredIngredients = reverseRecipeMapping[itemName] || [];
+        
+        if (requiredIngredients.length === 0) {
+            console.log(`ℹ️ No ingredients required for: ${itemName}`);
+            return res.json({
+                success: true,
+                message: 'No ingredients to deduct',
+                deductedIngredients: []
+            });
+        }
+        
+        const deductedIngredients = [];
+        const failedIngredients = [];
+        
+        for (const ingredientName of requiredIngredients) {
+            try {
+                const inventoryItem = await InventoryItem.findOne({
+                    itemName: { $regex: new RegExp(`^${ingredientName}$`, 'i') },
+                    itemType: 'raw',
+                    isActive: true
+                });
+                
+                if (!inventoryItem) {
+                    console.warn(`⚠️ Raw ingredient not found: ${ingredientName}`);
+                    failedIngredients.push(`${ingredientName} (not in inventory)`);
+                    continue;
+                }
+                
+                const quantityToDeduct = quantity || 1;
+                const previousStock = inventoryItem.currentStock;
+                const newStock = Math.max(0, previousStock - quantityToDeduct);
+                
+                // Update stock
+                inventoryItem.currentStock = newStock;
+                
+                // Update status
+                if (newStock <= 0) {
+                    inventoryItem.status = 'out_of_stock';
+                } else if (newStock <= inventoryItem.minStock) {
+                    inventoryItem.status = 'low_stock';
+                } else {
+                    inventoryItem.status = 'in_stock';
+                }
+                
+                // Record usage
+                inventoryItem.usageHistory.push({
+                    quantity: quantityToDeduct,
+                    notes: `${reason} - ${itemName}`,
+                    usedBy: req.user?.username || 'Admin',
+                    date: new Date()
+                });
+                
+                await inventoryItem.save();
+                
+                deductedIngredients.push({
+                    ingredient: ingredientName,
+                    quantity: quantityToDeduct,
+                    unit: inventoryItem.unit,
+                    previousStock: previousStock,
+                    newStock: newStock,
+                    status: inventoryItem.status
+                });
+                
+                console.log(`  ✓ ${ingredientName}: ${previousStock} → ${newStock} ${inventoryItem.unit} [${inventoryItem.status}]`);
+                
+            } catch (err) {
+                console.error(`❌ Error deducting ingredient ${ingredientName}:`, err.message);
+                failedIngredients.push(`${ingredientName} (error)`);
+            }
+        }
+        
+        res.json({
+            success: true,
+            message: `Deducted ingredients for ${itemName}`,
+            deductedIngredients: deductedIngredients,
+            failedIngredients: failedIngredients,
+            totalDeducted: deductedIngredients.length
+        });
+        
+    } catch (error) {
+        console.error('❌ Error deducting ingredients:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Error deducting ingredients',
+            error: error.message
+        });
+    }
+});
+
 app.delete('/api/inventory/:itemId', verifyToken, verifyAdmin, async (req, res) => {
     try {
         console.log(`📦 API: Deleting inventory item ${req.params.itemId}...`);
@@ -3367,6 +3639,36 @@ app.get('/api/user', verifyToken, async (req, res) => {
     } catch (error) {
         console.error('Error fetching user:', error);
         res.status(500).json({ success: false, message: 'Error fetching user' });
+    }
+});
+
+// Current user endpoint (alias for /api/user)
+app.get('/api/user/me', verifyToken, async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id || req.user.userId;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Invalid token' });
+        }
+        
+        const user = await User.findById(userId).select('-password');
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        
+        res.json({
+            success: true,
+            data: {
+                _id: user._id,
+                username: user.username,
+                email: user.email,
+                fullName: user.fullName || user.name || user.username,
+                phone: user.phone || '',
+                role: user.role
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching current user:', error);
+        res.status(500).json({ success: false, message: 'Error fetching current user' });
     }
 });
 

@@ -137,6 +137,7 @@ const validRawIngredients = {
     'Peppercorn': 'dry',
     'Chili flakes': 'dry',
     'Honey': 'dry',
+    'Paprika': 'dry',
     'Bay leaves': 'dry',
     'Herbs': 'dry',
     'Vegetables': 'dry',
@@ -1083,6 +1084,104 @@ function closeModal() {
     hideDuplicateNotification();
 }
 
+// ==================== VIEW USAGE HISTORY ====================
+function viewUsageHistory(itemId, itemName) {
+    const item = allInventoryItems.find(i => (i._id || i.id) === itemId);
+    
+    if (!item) {
+        alert('Item not found');
+        return;
+    }
+    
+    const usageHistory = item.usageHistory || [];
+    
+    if (usageHistory.length === 0) {
+        alert(`📋 No deduction history for ${itemName}\n\nThis ingredient has not been deducted from any orders yet.`);
+        return;
+    }
+    
+    // Create a detailed history modal
+    const historyModal = document.createElement('div');
+    historyModal.className = 'history-modal';
+    historyModal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 20px;
+    `;
+    
+    const sortedHistory = [...usageHistory].reverse();
+    const totalDeducted = usageHistory.reduce((sum, record) => sum + (record.quantity || 0), 0);
+    
+    const historyHTML = `
+        <div style="background: white; border-radius: 8px; padding: 30px; max-width: 600px; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #333;">📋 Usage History: ${itemName}</h3>
+                <button onclick="this.closest('.history-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">✕</button>
+            </div>
+            
+            <div style="background: #f0f0f0; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center;">
+                    <div>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Total Deductions</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #dc3545;">-${totalDeducted} ${item.unit || 'units'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Total Records</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #4e8a6a;">${usageHistory.length}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="border-top: 2px solid #e0e0e0; padding-top: 15px;">
+                ${sortedHistory.map((record, idx) => `
+                    <div style="padding: 12px; margin-bottom: 10px; background: #f9f9f9; border-left: 4px solid #dc3545; border-radius: 4px;">
+                        <div style="display: flex; justify-content: space-between; align-items: start; gap: 10px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: #333; margin-bottom: 4px;">
+                                    <span style="color: #dc3545; font-size: 16px;">-${record.quantity} ${item.unit || 'units'}</span>
+                                </div>
+                                <div style="font-size: 13px; color: #666; margin-bottom: 4px;">
+                                    ${record.notes || 'Manual deduction'}
+                                </div>
+                                <div style="font-size: 11px; color: #999;">
+                                    <strong>By:</strong> ${record.usedBy || 'System'} 
+                                    <span style="margin-left: 10px;">📅 ${new Date(record.date).toLocaleString('en-PH')}</span>
+                                </div>
+                            </div>
+                            <div style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap;">
+                                #${idx + 1}
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e0e0e0; text-align: center;">
+                <button onclick="this.closest('.history-modal').remove()" style="background: #4e8a6a; color: white; border: none; padding: 10px 30px; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+    
+    historyModal.innerHTML = historyHTML;
+    document.body.appendChild(historyModal);
+    
+    console.log(`✅ Opened usage history for ${itemName}:`, {
+        totalRecords: usageHistory.length,
+        totalDeducted: totalDeducted,
+        unit: item.unit
+    });
+}
+
 // ==================== GRID RENDERING FUNCTIONS ====================
 
 function renderDashboardGrid() {
@@ -1102,8 +1201,8 @@ function renderDashboardGrid() {
         return 0;
     });
     
-    // Take only top 12 items for dashboard
-    const displayItems = sortedItems.slice(0, 12);
+    // Display all inventory items (changed from 12 to show all items with pagination)
+    const displayItems = sortedItems.slice(0, Math.max(sortedItems.length, 24));
     
     if (displayItems.length === 0) {
         elements.dashboardGrid.innerHTML = `
@@ -1125,6 +1224,25 @@ function renderDashboardGrid() {
         const isOutOfStock = currentStock === 0;
         const isLowStock = currentStock > 0 && currentStock <= minStock;
         const percentage = maxStock > 0 ? Math.min(100, (currentStock / maxStock) * 100) : 0;
+        
+        // Get recent usage history (last 3 entries)
+        const recentUsage = (item.usageHistory || []).slice(-3).reverse();
+        const usageHTML = recentUsage.length > 0 ? `
+            <div class="usage-history">
+                <div class="usage-header">
+                    <span class="label">🧂 Recent Deductions:</span>
+                </div>
+                <div class="usage-list">
+                    ${recentUsage.map(usage => `
+                        <div class="usage-item">
+                            <span class="usage-qty">-${usage.quantity} ${unit}</span>
+                            <span class="usage-note">${usage.notes || 'Manual deduction'}</span>
+                            <span class="usage-user">${usage.usedBy || 'System'}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        ` : '';
         
         return `
             <div class="dashboard-card ${isOutOfStock ? 'out-of-stock' : isLowStock ? 'low-stock' : 'in-stock'}">
@@ -1155,6 +1273,7 @@ function renderDashboardGrid() {
                             </span>
                         </div>
                     </div>
+                    ${usageHTML}
                 </div>
                 <div class="card-footer">
                     <button class="btn btn-sm btn-primary" onclick="openEditModal('${item._id || item.id}')">
@@ -1307,7 +1426,7 @@ function renderFilteredDashboardGrid(filteredItems) {
         return;
     }
     
-    const displayItems = filteredItems.slice(0, 12);
+    const displayItems = filteredItems.slice(0, Math.max(filteredItems.length, 24));
     
     elements.dashboardGrid.innerHTML = displayItems.map(item => {
         const currentStock = parseFloat(item.currentStock) || 0;
@@ -1317,6 +1436,25 @@ function renderFilteredDashboardGrid(filteredItems) {
         const isOutOfStock = currentStock === 0;
         const isLowStock = currentStock > 0 && currentStock <= minStock;
         const percentage = maxStock > 0 ? Math.min(100, (currentStock / maxStock) * 100) : 0;
+        
+        // Get recent usage history (last 3 entries)
+        const recentUsage = (item.usageHistory || []).slice(-3).reverse();
+        const usageHTML = recentUsage.length > 0 ? `
+            <div class="usage-history">
+                <div class="usage-header">
+                    <span class="label">🧂 Recent Deductions:</span>
+                </div>
+                <div class="usage-list">
+                    ${recentUsage.map(usage => `
+                        <div class="usage-item">
+                            <span class="usage-qty">-${usage.quantity} ${unit}</span>
+                            <span class="usage-note">${usage.notes || 'Manual deduction'}</span>
+                            <span class="usage-user">${usage.usedBy || 'System'}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        ` : '';
         
         return `
             <div class="dashboard-card ${isOutOfStock ? 'out-of-stock' : isLowStock ? 'low-stock' : 'in-stock'}">
@@ -1347,6 +1485,7 @@ function renderFilteredDashboardGrid(filteredItems) {
                             </span>
                         </div>
                     </div>
+                    ${usageHTML}
                 </div>
                 <div class="card-footer">
                     <button class="btn btn-sm btn-primary" onclick="openEditModal('${item._id || item.id}')">

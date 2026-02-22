@@ -290,7 +290,8 @@ async function loadTodayOrders() {
     try {
         console.log('📦 Fetching today\'s orders from MongoDB...');
         
-        const response = await fetch(`/api/orders/today?limit=5`, {
+        // ✅ Increased limit from 5 to 20 to show more orders
+        const response = await fetch(`/api/orders/today?limit=20`, {
             credentials: 'include'
         });
         
@@ -298,11 +299,16 @@ async function loadTodayOrders() {
             const result = await response.json();
             dashboardData.orders = result.data || result.orders || [];
             
-            console.log('✅ Orders fetched successfully:', dashboardData.orders.length);
+            console.log('✅ Orders fetched successfully:', dashboardData.orders.length, 'orders');
             
             // Log order details for debugging
             if (dashboardData.orders.length > 0) {
                 console.log('📋 Sample order:', dashboardData.orders[0]);
+                console.log('📊 All orders:', dashboardData.orders.map(o => ({
+                    orderNumber: o.orderNumber,
+                    customerId: o.customerId,
+                    total: o.total
+                })));
             }
         } else {
             console.warn('⚠️ Failed to fetch orders:', response.status);
@@ -328,9 +334,29 @@ async function loadTopSellingItems() {
             const result = await response.json();
             console.log('✅ Top Selling Items API response:', result);
             
+            // Log debug info from server
+            if (result.debug) {
+                console.log('🔍 Server Debug Info:', {
+                    totalOrders: result.debug.totalOrders,
+                    completedOrders: result.debug.completedOrders,
+                    recentOrders: result.debug.recentOrders
+                });
+            }
+            
             // Map ALL products from the API response, don't limit to 5 here
-            dashboardData.topSelling = (result.data || result.items || [])
-                .filter(item => item._id && item._id !== 'Unknown' && item._id !== 'Unknown Item')
+            const rawData = result.data || result.items || [];
+            console.log(`📊 Raw data from API: ${rawData.length} items`);
+            
+            dashboardData.topSelling = rawData
+                .filter(item => {
+                    // Filter out null/empty names AND "Unknown Item"
+                    const isValid = item._id && 
+                                   item._id !== null && 
+                                   item._id !== '' && 
+                                   item._id !== 'Unknown Item';
+                    if (!isValid) console.log('⊘ Filtering out invalid item:', item);
+                    return isValid;
+                })
                 .map(item => {
                     const itemId = typeof item._id === 'string' ? item._id : item._id || item.name || 'Unknown';
                     return {
@@ -341,7 +367,7 @@ async function loadTopSellingItems() {
                     };
                 });
             
-            console.log(`✅ Top Selling Items loaded: ${dashboardData.topSelling.length} items`);
+            console.log(`✅ Top Selling Items loaded: ${dashboardData.topSelling.length} items after filtering`);
             
             // Log details for debugging
             if (dashboardData.topSelling.length > 0) {
@@ -350,13 +376,19 @@ async function loadTopSellingItems() {
                     revenue: i.revenue,
                     quantity: i.quantity
                 })));
+            } else {
+                console.warn('⚠️ No items after filtering. Raw data:', rawData);
+                console.log('💡 Tip: Add some orders to see top selling items');
             }
         } else {
+            const errorText = await response.text();
             console.warn('⚠️ Top Selling Items API failed with status:', response.status);
+            console.warn('Response body:', errorText);
             dashboardData.topSelling = [];
         }
     } catch (error) {
         console.error('❌ Error loading top selling items:', error);
+        console.error('Error details:', error.message, error.stack);
         dashboardData.topSelling = [];
     }
 }
@@ -780,7 +812,10 @@ function updateOrdersTable() {
         return;
     }
     
-    const displayOrders = ordersData.slice(0, 5);
+    // ✅ Display up to 20 orders instead of just 5
+    const displayOrders = ordersData.slice(0, 20);
+    
+    console.log(`📋 Displaying ${displayOrders.length} of ${ordersData.length} orders in table`);
     
     displayOrders.forEach((order, index) => {
         try {
@@ -797,10 +832,12 @@ function updateOrdersTable() {
             if (order.customerId) {
                 if (typeof order.customerId === 'object' && order.customerId.customerId) {
                     customerId = order.customerId.customerId;
-                } else if (typeof order.customerId === 'string') {
+                } else if (typeof order.customerId === 'string' && order.customerId.trim() !== '') {
                     customerId = order.customerId;
                 }
             }
+            
+            console.log(`  Order ${index + 1}: ${order.orderNumber} - Customer: ${customerId}`);
             
             row.innerHTML = `
                 <td>${order.orderNumber || order.order_id || 'N/A'}</td>
@@ -815,6 +852,8 @@ function updateOrdersTable() {
             console.error('❌ Error rendering order:', error, order);
         }
     });
+    
+    console.log(`✅ Orders table updated with ${displayOrders.length} orders`);
 }
 
 // Update top selling items table
@@ -830,10 +869,11 @@ function updateTopSellingTable() {
     if (topSellingData.length === 0) {
         topItemsTableBody.innerHTML = `
             <tr>
-                <td colspan="3" class="no-data">No sales data available</td>
+                <td colspan="3" class="no-data">No sales data available - Check console for API errors</td>
             </tr>
         `;
-        console.warn('⚠️ No top selling data to display');
+        console.warn('⚠️ No top selling data to display. dashboardData:', dashboardData);
+        console.warn('Ensure /api/orders/top-items endpoint is returning data');
         return;
     }
     

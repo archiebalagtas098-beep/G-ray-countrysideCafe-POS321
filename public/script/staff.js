@@ -1144,12 +1144,17 @@ function addItemToOrder(name, price, product = null) {
         existingItem.subtotal = existingItem.quantity * existingItem.price;
     } else {
         currentOrder.push({
-            name: product.name,
+            id: product._id,
+            itemName: product.itemName || product.name,
+            name: product.name || product.itemName,
             price: product.price,
             quantity: 1,
             subtotal: product.price,
             unit: product.unit,
-            _id: product._id
+            _id: product._id,
+            image: product.image || 'default_food.jpg',
+            vatable: product.vatable !== undefined ? product.vatable : true,
+            size: 'Regular'
         });
     }
     
@@ -1243,6 +1248,35 @@ function clearCurrentOrder() {
     updateChange();
 }
 
+// ==================== 💰 PAYMENT CONFIRMATION ====================
+function showOrderConfirmation() {
+    if (!currentOrder || currentOrder.length === 0) {
+        alert("No items in order");
+        return;
+    }
+    
+    if (!orderType || orderType === "None") {
+        alert("Please select order type (Dine In or Takeout)");
+        return;
+    }
+    
+    if (orderType === "Dine In" && !tableNumber) {
+        alert("Please enter table number");
+        return;
+    }
+    
+    if (!selectedPaymentMethod) {
+        alert("Please select payment method");
+        return;
+    }
+    
+    // Show the payment confirmation modal
+    const paymentModal = document.getElementById('paymentModal');
+    if (paymentModal) {
+        paymentModal.style.display = 'block';
+    }
+}
+
 // ==================== 💰 ORDER TYPE FUNCTIONS ====================
 function setDineIn() {
     orderType = "Dine In";
@@ -1263,7 +1297,7 @@ function setDineIn() {
 }
 
 function setTakeout() {
-    orderType = "Take Out";
+    orderType = "Takeout";
     tableNumber = null;
     const display = document.getElementById("orderTypeDisplay");
     if (display) display.textContent = orderType;
@@ -1569,13 +1603,19 @@ function showPaymentConfirmation(paymentDetails) {
 }
 
 async function Payment() {
+    console.log('💳 === PAYMENT PROCESS STARTED ===');
+    console.log('Current order items:', currentOrder.length);
+    console.log('Order type:', orderType);
+    console.log('Payment method:', selectedPaymentMethod);
+    console.log('Payment amount:', paymentAmount);
+    
     if (!currentOrder.length) {
         alert("Please add items to order");
         return;
     }
     
     if (!orderType || orderType === "None") {
-        alert("Please select order type (Dine In or Take Out)");
+        alert("Please select order type (Dine In or Takeout)");
         return;
     }
     
@@ -1619,6 +1659,11 @@ async function Payment() {
     
     try {
         // 1️⃣ SAVE ORDER TO DATABASE
+        console.log('🔄 Validating payment data...');
+        console.log('Payment method selected:', selectedPaymentMethod);
+        console.log('Payment amount entered:', paymentAmount);
+        console.log('Order total:', total);
+        
         // ✅ Map GCash to 'online' for valid enum value
         const paymentMethod = selectedPaymentMethod === 'gcash' ? 'online' : selectedPaymentMethod;
         
@@ -1643,23 +1688,45 @@ async function Payment() {
             notes: ''
         };
         
-        // console.log('💾 Saving order to database:', orderPayload);
+        console.log('💾 Prepared order payload:', orderPayload);
+        console.log('📦 Sending to /api/orders endpoint...');
         
         const saveResponse = await fetch('/api/orders', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify(orderPayload)
         });
         
+        console.log('📨 Response received:', {
+            status: saveResponse.status,
+            statusText: saveResponse.statusText,
+            ok: saveResponse.ok,
+            headers: {
+                'content-type': saveResponse.headers.get('content-type')
+            }
+        });
+        
         if (!saveResponse.ok) {
-            const errorData = await saveResponse.json();
-            throw new Error(errorData.message || 'Failed to save order');
+            let errorMessage = 'Failed to save order';
+            try {
+                const errorData = await saveResponse.json();
+                errorMessage = errorData.message || errorData.error || errorMessage;
+            } catch (e) {
+                errorMessage = `Server error: ${saveResponse.status} ${saveResponse.statusText}`;
+            }
+            console.error('❌ Order save failed:', errorMessage);
+            throw new Error(errorMessage);
         }
         
         const savedOrder = await saveResponse.json();
-        // console.log('✅ Order saved successfully:', savedOrder);
+        console.log('✅ Order saved successfully:', savedOrder);
+        
+        // Show success message
+        showToast('✅ Order saved! Preparing receipt...', 'success', 2000);
         
         // 2️⃣ Generate and print receipt
         const receiptNumber = `RCP-${Date.now().toString().slice(-8)}`;
@@ -1667,16 +1734,48 @@ async function Payment() {
         
         // Create receipt HTML
         const receiptHTML = generateReceiptHTML(receiptNumber, total, change, gcashRef);
+        console.log('📄 Receipt HTML generated, length:', receiptHTML.length);
         
         // Print receipt
+        console.log('🖨️ Initiating print...');
         printReceipt(receiptHTML);
         
-        // 3️⃣ Clear order completely
-        clearOrderAfterPayment();
+        // 3️⃣ Clear order completely after a short delay to ensure print dialog appears
+        setTimeout(() => {
+            clearOrderAfterPayment();
+            showToast('✅ Order completed! Ready for new order.', 'success', 3000);
+        }, 500);
                
     } catch (error) {
-        // console.error('❌ Error processing payment:', error);
-        showToast(`❌ Payment error: ${error.message}`, 'error', 3000);
+        console.error('❌ === PAYMENT ERROR ===');
+        console.error('Error type:', error.constructor.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        
+        // Log more details for debugging
+        if (error instanceof TypeError) {
+            console.error('🔴 This is likely a network error (CORS, server down, etc.)');
+        }
+        if (error instanceof SyntaxError) {
+            console.error('🔴 Response parsing error - invalid JSON from server');
+        }
+        
+        // Show user-friendly error message
+        let userMessage = error.message;
+        if (error.message.includes('NetworkError') || error instanceof TypeError) {
+            userMessage = 'Network error: Server is not responding. Please check if server is running.';
+        } else if (error.message.includes('Failed to fetch')) {
+            userMessage = 'Connection error: Cannot reach server. Please check your internet connection.';
+        } else if (error.message.includes('Insufficient payment')) {
+            userMessage = 'Insufficient payment amount. Please enter correct amount.';
+        } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+            userMessage = 'Session expired. Please login again.';
+        } else if (error.message.includes('No items in order')) {
+            userMessage = 'Order has no items. Please add items to the order.';
+        }
+        
+        console.error('Final error message to user:', userMessage);
+        showToast(`❌ ${userMessage}`, 'error', 4000);
     }
 }
 
@@ -1800,7 +1899,7 @@ function generateReceiptHTML(receiptNumber, total, change, gcashRef = '') {
     const tableInfo = orderType === 'Dine In' ? `
         <div class="info-row">Order Type: Dine In (Table: ${tableNumber})</div>
     ` : `
-        <div class="info-row">Order Type: Take Out</div>
+        <div class="info-row">Order Type: Takeout</div>
     `;
     
     // Generate transaction number
@@ -2053,33 +2152,84 @@ function generateReceiptHTML(receiptNumber, total, change, gcashRef = '') {
                     <div class="footer-small">${receiptDateTime}</div>
                 </div>
             </div>
-            
-            <script>
-                window.onload = function() {
-                    window.print();
-                };
-            </script>
         </body>
         </html>
     `;
 }
+
 // ==================== 🖨️ PRINT RECEIPT ====================
 function printReceipt(receiptHTML) {
-    const printWindow = window.open('', 'receipt', 'width=400,height=600');
-    printWindow.document.write(receiptHTML);
-    printWindow.document.close();
-    
-    // Close window after print completes
-    printWindow.onbeforeprint = function() {
-        // console.log('📄 Print started...');
-    };
-    
-    printWindow.onafterprint = function() {
-        // console.log('📄 Print completed, closing window...');
+    try {
+        console.log('🖨️ Preparing receipt for printing...');
+        
+        // Create a new window with specific features
+        const printWindow = window.open('', 'receipt_' + Date.now(), 'width=800,height=600,menubar=no,toolbar=no,location=no,status=no');
+        
+        if (!printWindow || printWindow.closed) {
+            console.error('❌ Print window blocked by browser');
+            showToast('Print window blocked. Please allow popups in browser settings.', 'error', 3000);
+            return;
+        }
+        
+        console.log('✅ Print window opened successfully');
+        
+        // Write content to the new window
+        printWindow.document.open();
+        printWindow.document.write(receiptHTML);
+        printWindow.document.close();
+        
+        // Function to handle print
+        const triggerPrint = () => {
+            console.log('�️ Triggering print dialog...');
+            try {
+                printWindow.focus();
+                printWindow.print();
+                console.log('✅ Print dialog opened');
+            } catch (err) {
+                console.error('❌ Print trigger error:', err);
+            }
+        };
+        
+        // Try to print once document is ready
+        let printAttempts = 0;
+        const maxAttempts = 5;
+        
+        const printInterval = setInterval(() => {
+            printAttempts++;
+            
+            // Check if window is still open and content is loaded
+            if (printWindow && !printWindow.closed && printWindow.document.readyState === 'complete') {
+                clearInterval(printInterval);
+                console.log('📄 Document ready, printing now...');
+                setTimeout(triggerPrint, 300);
+            } else if (printAttempts >= maxAttempts) {
+                clearInterval(printInterval);
+                console.log('⏱️ Max attempts reached, printing anyway...');
+                setTimeout(triggerPrint, 300);
+            }
+        }, 200);
+        
+        // Ensure print is triggered even if readyState check fails
         setTimeout(() => {
-            printWindow.close();
-        }, 300);
-    };
+            if (printWindow && !printWindow.closed) {
+                clearInterval(printInterval);
+                triggerPrint();
+            }
+        }, 1500);
+        
+        // Close window after print (handle browser print dialog close)
+        if (printWindow.onbeforeunload === undefined) {
+            printWindow.onbeforeunload = () => {
+                console.log('✅ Print window closing');
+            };
+        }
+        
+        console.log('✅ Print receipt setup completed');
+        
+    } catch (error) {
+        console.error('❌ Print receipt error:', error);
+        showToast(`Print error: ${error.message}`, 'error', 3000);
+    }
 }
 
 // ==================== 📦 STOCK REQUEST FUNCTIONS ====================

@@ -676,8 +676,8 @@ if (window.location.pathname.includes('orderhistory')) {
             
             console.log('📅 Fetching today\'s orders from /api/orders/today...');
             
-            // Fetch today's orders from API
-            const response = await fetch('/api/orders/today?limit=5', {
+            // ✅ Increased limit from 5 to 100 to show all orders
+            const response = await fetch('/api/orders/today?limit=100', {
                 credentials: 'include',
                 headers: {
                     'Accept': 'application/json'
@@ -691,24 +691,39 @@ if (window.location.pathname.includes('orderhistory')) {
             const result = await response.json();
             const todayOrders = result.success ? result.data : [];
             
-            console.log('📅 Today\'s orders fetched:', todayOrders.length);
+            console.log('📅 Today\'s orders fetched:', todayOrders.length, 'orders');
             body.innerHTML = '';
             
             if (todayOrders.length > 0) {
-                todayOrders.slice(0, 5).forEach(order => {
+                console.log('📋 Displaying all', todayOrders.length, 'orders');
+                
+                // ✅ Display ALL orders, not just first 5
+                todayOrders.forEach((order, index) => {
                     const time = new Date(order.createdAt).toLocaleTimeString('en-US', {
                         hour: '2-digit',
                         minute: '2-digit'
                     });
                     
+                    // ✅ Handle customer ID properly
+                    let customerId = 'Walk-in';
+                    if (order.customerId) {
+                        if (typeof order.customerId === 'object' && order.customerId.customerId) {
+                            customerId = order.customerId.customerId;
+                        } else if (typeof order.customerId === 'string' && order.customerId.trim() !== '') {
+                            customerId = order.customerId;
+                        }
+                    }
+                    
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${order.orderNumber || 'N/A'}</td>
                         <td>${time}</td>
-                        <td>${order.customerName || 'Walk-in'}</td>
+                        <td>${customerId}</td>
                         <td>₱${(order.total || 0).toFixed(2)}</td>
                     `;
                     body.appendChild(row);
+                    
+                    console.log(`  ✅ Order ${index + 1}: ${order.orderNumber} - ${customerId}`);
                 });
             } else {
                 body.innerHTML = `
@@ -720,7 +735,7 @@ if (window.location.pathname.includes('orderhistory')) {
                 `;
             }
             
-            console.log('✅ Today\'s orders table updated');
+            console.log(`✅ Today's orders table updated with ${todayOrders.length} orders`);
         } catch (error) {
             console.error('❌ Error loading today\'s orders:', error);
             const body = document.getElementById('todaysOrdersBody');

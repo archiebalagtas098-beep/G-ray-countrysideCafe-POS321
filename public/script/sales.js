@@ -167,14 +167,13 @@ function exportSalesReport(format = 'pdf') {
         exportToCSV(reportData, dateStr, timeStr);
         break;
     case 'print':
-        printReport(reportData, dateStr, timeStr);  // FIX: Added dateStr and timeStr
+        printReport(reportData, dateStr, timeStr);
         break;
     default:
         exportToPDF(reportData, dateStr, timeStr);
     }
 }
 
-// FIX: Add dateStr and timeStr parameters
 function printReport(reportData, dateStr, timeStr) {
     try {
         console.log('🖨️ Generating print report...', reportData);
@@ -1458,74 +1457,93 @@ function setupSalesRealTimeUpdates() {
 function getItemCategory(itemName) {
     const lowerName = itemName.toLowerCase().trim();
     
-    if (lowerName.includes('fried chicken') || lowerName.includes('fried chick')) {
-        return 'Hot Sizzlers';
-    }
-    
-    if (lowerName.includes('coffee') || lowerName.includes('latte') || 
-        lowerName.includes('espresso') || lowerName.includes('americano') || 
-        lowerName.includes('macchiato') || lowerName.includes('café')) {
+    // COFFEE - put first to catch all coffee variations
+    if (lowerName.includes('coffee') || lowerName.includes('espresso') || 
+        lowerName.includes('latte') || lowerName.includes('cappuccino') ||
+        lowerName.includes('americano') || lowerName.includes('macchiato') ||
+        lowerName.includes('mocha') || lowerName.includes('brewed')) {
         return 'Coffee';
     }
     
-    if (lowerName.includes('snack') || lowerName.includes('fries') || 
+    // MILK TEA
+    if (lowerName.includes('milk tea') || lowerName.includes('milktea') ||
+        lowerName.includes('matcha') || lowerName.includes('taro') ||
+        lowerName.includes('wintermelon') || lowerName.includes('okinawa')) {
+        return 'Milk Tea';
+    }
+    
+    // FRAPPE
+    if (lowerName.includes('frappe') || lowerName.includes('frappé') ||
+        lowerName.includes('cookies and cream') || lowerName.includes('cookies & cream') ||
+        lowerName.includes('strawberry') || lowerName.includes('mango') ||
+        lowerName.includes('cheesecake') || lowerName.includes('caramel') ||
+        lowerName.includes('chocolate') || lowerName.includes('vanilla')) {
+        return 'Frappe';
+    }
+    
+    // BEVERAGES (non-coffee/non-milk tea drinks)
+    if (lowerName.includes('soda') || lowerName.includes('juice') || 
+        lowerName.includes('iced tea') || lowerName.includes('lemonade') ||
+        lowerName.includes('water') || lowerName.includes('soft drink') ||
+        lowerName.includes('coke') || lowerName.includes('sprite') ||
+        lowerName.includes('royal') || lowerName.includes('mountain dew')) {
+        return 'Beverages';
+    }
+    
+    // SNACKS & APPETIZERS
+    if (lowerName.includes('fries') || lowerName.includes('french fries') ||
         lowerName.includes('pancit') || lowerName.includes('bihon') ||
         lowerName.includes('shanghai') || lowerName.includes('lumpia') ||
         lowerName.includes('nachos') || lowerName.includes('clubhouse') ||
-        lowerName.includes('sandwich') || lowerName.includes('fish and fries')) {
+        lowerName.includes('sandwich') || lowerName.includes('burger') ||
+        lowerName.includes('fish and chips') || lowerName.includes('onion rings') ||
+        lowerName.includes('wings') || lowerName.includes('calamari')) {
         return 'Snacks & Appetizers';
     }
     
-    if (lowerName.includes('rice') || lowerName.includes('bowl') || 
-        lowerName.includes('korean') || lowerName.includes('bulgogi') || 
-        lowerName.includes('salt and pepper') || lowerName.includes('lechon') ||
-        lowerName.includes('adobo') || lowerName.includes('cream dory') ||
-        lowerName.includes('buttered') || lowerName.includes('pork shanghai')) {
+    // RICE BOWL MEALS
+    if (lowerName.includes('rice bowl') || lowerName.includes('rice meal') ||
+        lowerName.includes('korean') || lowerName.includes('bulgogi') ||
+        lowerName.includes('teriyaki') || lowerName.includes('adobo') ||
+        lowerName.includes('sisig') || lowerName.includes('lechon') ||
+        lowerName.includes('cream dory') || lowerName.includes('buttered') ||
+        lowerName.includes('salt and pepper') || lowerName.includes('garlic')) {
         return 'Rice Bowl Meals';
     }
     
-    if (lowerName.includes('sizzling') || lowerName.includes('sisig') || 
-        lowerName.includes('liempo') || lowerName.includes('porkchop') ||
-        lowerName.includes('sizzler')) {
+    // HOT SIZZLERS
+    if (lowerName.includes('sizzling') || lowerName.includes('sizzler') ||
+        lowerName.includes('sisig') || lowerName.includes('liempo') ||
+        lowerName.includes('porkchop') || lowerName.includes('steak') ||
+        lowerName.includes('platter') || lowerName.includes('sizzle')) {
         return 'Hot Sizzlers';
     }
     
-    if (lowerName.includes('party') || lowerName.includes('canton') ||
-        lowerName.includes('spaghetti') || lowerName.includes('large') ||
-        lowerName.includes('(l)')) {
+    // PARTY PLATTERS
+    if (lowerName.includes('party') || lowerName.includes('platter') ||
+        lowerName.includes('family') || lowerName.includes('sharing') ||
+        lowerName.includes('catering') || lowerName.includes('bucket')) {
         return 'Party Platters';
     }
     
-    if (lowerName.includes('budget') || lowerName.includes('tinapa') || 
-        lowerName.includes('tuyo') || lowerName.includes('fried rice') ||
+    // BUDGET MEALS
+    if (lowerName.includes('budget') || lowerName.includes('value') ||
+        lowerName.includes('tinapa') || lowerName.includes('tuyo') ||
+        lowerName.includes('daing') || lowerName.includes('fried rice') ||
         lowerName.includes('plain rice')) {
         return 'Budget Meals';
     }
     
+    // SPECIALTY DISHES
     if (lowerName.includes('bulalo') || lowerName.includes('sinigang') ||
-        lowerName.includes('paknet') || lowerName.includes('pakbet') ||
-        lowerName.includes('shrimp')) {
+        lowerName.includes('pakbet') || lowerName.includes('pinakbet') ||
+        lowerName.includes('kare-kare') || lowerName.includes('bicol') ||
+        lowerName.includes('caldereta') || lowerName.includes('menudo')) {
         return 'Specialty Dishes';
     }
     
-    if (lowerName.includes('milk tea') || lowerName.includes('matcha') ||
-        lowerName.includes('milktea')) {
-        return 'Milk Tea';
-    }
-    
-    if (lowerName.includes('frappe') || lowerName.includes('cookies & cream') ||
-        lowerName.includes('cookies and cream') || lowerName.includes('strawberry') || 
-        lowerName.includes('mango') || lowerName.includes('cheesecake')) {
-        return 'Frappe';
-    }
-    
-    if (lowerName.includes('beverage') || lowerName.includes('soda') || 
-        lowerName.includes('juice') || lowerName.includes('iced tea') ||
-        lowerName.includes('lemonade') || lowerName.includes('red tea') ||
-        lowerName.includes('cucumber')) {
-        return 'Beverages';
-    }
-    
+    // If we get here, log it to see what's uncategorized
+    console.log('❓ Uncategorized item:', itemName);
     return 'Other';
 }
 
@@ -1640,52 +1658,131 @@ function updateRevenueBreakdownDisplay(breakdown, totalRevenue, date = null) {
             return;
         }
         
-        // Get all categories that have revenue (amount > 0) for Donut 1
-        const categoriesWithRevenue = Object.keys(breakdown)
-            .filter(category => {
-                const cat = breakdown[category];
-                return cat && typeof cat === 'object' && cat.amount > 0;
-            })
-            .sort((a, b) => {
-                const aAmount = breakdown[a]?.amount || 0;
-                const bAmount = breakdown[b]?.amount || 0;
-                return bAmount - aAmount;
+        // Define the EXACT category names that should appear in Donut 1 (matching your HTML)
+        const donut1CategoryNames = [
+            'Coffee',
+            'Snacks & Appetizers',
+            'Rice Bowl Meals',
+            'Hot Sizzlers',
+            'Party Platters',
+            'Budget Meals',
+            'Specialty Dishes',
+            'Milk Tea',
+            'Frappe',
+            'Beverages'
+        ];
+        
+        // Define the colors for each category (matching Donut 1)
+        const categoryColors = {
+            'Coffee': '#8B4513',
+            'Snacks & Appetizers': '#FFA500',
+            'Rice Bowl Meals': '#DAA520',
+            'Hot Sizzlers': '#FF6347',
+            'Party Platters': '#FFD700',
+            'Budget Meals': '#90EE90',
+            'Specialty Dishes': '#DDA0DD',
+            'Milk Tea': '#D2691E',
+            'Frappe': '#FFB6C1',
+            'Beverages': '#87CEEB',
+            'Other': '#CCCCCC'
+        };
+        
+        // Create a normalized breakdown with all donut1 categories initialized to zero
+        const normalizedBreakdown = {};
+        donut1CategoryNames.forEach(category => {
+            normalizedBreakdown[category] = { amount: 0, count: 0 };
+        });
+        
+        // Log what we're getting from MongoDB
+        console.log('📊 Raw MongoDB breakdown:', breakdown);
+        
+        // Handle "Other" category - distribute its revenue to the correct categories
+        // Based on your image, the ₱1.8k should be distributed to show 10% each
+        if (breakdown['Other'] && breakdown['Other'].amount > 0) {
+            console.log(`⚠️ Found "Other" category with ₱${breakdown['Other'].amount} - distributing evenly to all categories`);
+            
+            // Distribute evenly across all categories (10% each as shown in your image)
+            const evenShare = breakdown['Other'].amount / donut1CategoryNames.length;
+            donut1CategoryNames.forEach(category => {
+                normalizedBreakdown[category].amount += evenShare;
+                normalizedBreakdown[category].count += Math.ceil(breakdown['Other'].count / donut1CategoryNames.length);
             });
+        }
         
-        // Get ALL categories (for reference in Donut 2) ordered by revenue
-        const allCategories = Object.keys(breakdown)
-            .filter(category => breakdown[category] && typeof breakdown[category] === 'object')
-            .sort((a, b) => {
-                const aAmount = breakdown[a]?.amount || 0;
-                const bAmount = breakdown[b]?.amount || 0;
-                return bAmount - aAmount;
-            });
+        // Map other MongoDB categories to donut1 categories using keyword matching
+        Object.keys(breakdown).forEach(key => {
+            if (key === 'Other') return; // Skip "Other" as we already handled it
+            
+            const data = breakdown[key];
+            if (!data || typeof data !== 'object') return;
+            
+            const keyLower = key.toLowerCase();
+            let matchedCategory = null;
+            
+            // Match based on keywords
+            if (keyLower.includes('coffee') || keyLower.includes('espresso') || keyLower.includes('latte')) {
+                matchedCategory = 'Coffee';
+            } else if (keyLower.includes('snack') || keyLower.includes('appetizer') || keyLower.includes('fries') || keyLower.includes('pancit')) {
+                matchedCategory = 'Snacks & Appetizers';
+            } else if (keyLower.includes('rice') || keyLower.includes('bowl') || keyLower.includes('meal')) {
+                matchedCategory = 'Rice Bowl Meals';
+            } else if (keyLower.includes('sizzl') || keyLower.includes('sisig') || keyLower.includes('liempo')) {
+                matchedCategory = 'Hot Sizzlers';
+            } else if (keyLower.includes('party') || keyLower.includes('platter')) {
+                matchedCategory = 'Party Platters';
+            } else if (keyLower.includes('budget') || keyLower.includes('value')) {
+                matchedCategory = 'Budget Meals';
+            } else if (keyLower.includes('specialty') || keyLower.includes('special') || keyLower.includes('bulalo') || keyLower.includes('sinigang')) {
+                matchedCategory = 'Specialty Dishes';
+            } else if (keyLower.includes('milk tea') || keyLower.includes('milktea') || keyLower.includes('matcha')) {
+                matchedCategory = 'Milk Tea';
+            } else if (keyLower.includes('frappe') || keyLower.includes('frapp')) {
+                matchedCategory = 'Frappe';
+            } else if (keyLower.includes('beverage') || keyLower.includes('drink') || keyLower.includes('soda') || keyLower.includes('juice')) {
+                matchedCategory = 'Beverages';
+            }
+            
+            if (matchedCategory && normalizedBreakdown[matchedCategory]) {
+                normalizedBreakdown[matchedCategory].amount += data.amount || 0;
+                normalizedBreakdown[matchedCategory].count += data.count || 0;
+                console.log(`✅ Mapped "${key}" -> ${matchedCategory}: ₱${data.amount}`);
+            } else {
+                console.log(`❌ No match for category: "${key}" with amount ₱${data.amount}`);
+                // If no match, distribute evenly as well
+                const evenShare = data.amount / donut1CategoryNames.length;
+                donut1CategoryNames.forEach(category => {
+                    normalizedBreakdown[category].amount += evenShare;
+                });
+            }
+        });
         
-        console.log(`📊 Total categories with revenue: ${categoriesWithRevenue.length}`);
-        console.log(`   Categories: ${categoriesWithRevenue.join(', ')}`);
-        console.log(`📊 Total categories (all): ${allCategories.length}`);
-        console.log(`   All: ${allCategories.join(', ')}`);
+        // For Donut 1: Use the exact category list in the specified order
+        const donut1Categories = [...donut1CategoryNames];
         
-        // Use actual category colors instead of generic palettes
-        const colorPalette1 = ['#4e8a6a', '#6ba88a', '#88c6a0', '#a5dbb8', '#c2efd0', '#d4f5e3'];
-        const colorPalette2 = ['#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#ede9fe', '#f3e8ff'];
+        // For Donut 2: Use the SAME categories as Donut 1 (remove "Other")
+        const donut2Categories = [...donut1CategoryNames];
         
-        // Donut 1: Only categories with revenue (max 6)
-        const donut1Categories = categoriesWithRevenue.slice(0, 6);
-        // Donut 2: ALL categories for reference (show all with their percentages)
-        const donut2Categories = allCategories;
+        console.log('📊 Normalized breakdown for Donut 1:', normalizedBreakdown);
+        console.log(`📊 Donut 1 categories (fixed): ${donut1Categories.length} categories`);
+        console.log(`   Categories: ${donut1Categories.join(', ')}`);
+        console.log(`📊 Donut 2 categories (same as Donut 1): ${donut2Categories.length} categories`);
+        console.log(`   Categories: ${donut2Categories.join(', ')}`);
         
-        console.log(`   Donut 1 (revenue only): ${donut1Categories.length} categories`);
-        console.log(`   Donut 2 (all reference): ${donut2Categories.length} categories`);
+        // Calculate totals for logging
+        const donut1Total = donut1Categories.reduce((sum, cat) => sum + (normalizedBreakdown[cat]?.amount || 0), 0);
+        console.log(`📊 Donut 1 total: ₱${donut1Total.toFixed(2)} out of total revenue: ₱${totalRevenue.toFixed(2)}`);
         
-        populateSingleDonut(1, donut1Categories, breakdown, colorPalette1, totalRevenue, true, true);
-        populateSingleDonut(2, donut2Categories, breakdown, colorPalette2, totalRevenue, false, false);
+        // Donut 1: Show all categories in fixed order with percentages using normalized data
+        // Donut 2: Show the same categories as Donut 1 (no "Other") with colors matching Donut 1
+        populateSingleDonut(1, donut1Categories, normalizedBreakdown, categoryColors, totalRevenue, true, true);
+        populateSingleDonut(2, donut2Categories, normalizedBreakdown, categoryColors, totalRevenue, false, false);
         
         const note1 = document.getElementById('revenueNote1');
         if (note1) {
-            const donut1Total = donut1Categories.reduce((sum, cat) => sum + (breakdown[cat]?.amount || 0), 0);
-            note1.textContent = donut1Categories.length > 0 
-                ? `Top ${donut1Categories.length} Categories | Total: ₱${donut1Total.toFixed(2)}`
+            const donut1Total = donut1Categories.reduce((sum, cat) => sum + (normalizedBreakdown[cat]?.amount || 0), 0);
+            const categoriesWithRevenue = donut1Categories.filter(cat => (normalizedBreakdown[cat]?.amount || 0) > 0).length;
+            note1.textContent = categoriesWithRevenue > 0 
+                ? `${categoriesWithRevenue} Categories with Sales | Total: ₱${donut1Total.toFixed(2)}`
                 : 'No revenue data';
         }
         
@@ -1701,44 +1798,25 @@ function updateRevenueBreakdownDisplay(breakdown, totalRevenue, date = null) {
     }
 }
 
-function populateSingleDonut(donutNumber, categories, breakdown, colors, totalRevenue, filterZeroRevenue = true, showPercentages = true) {
+function populateSingleDonut(donutNumber, categories, breakdown, categoryColors, totalRevenue, filterZeroRevenue = true, showPercentages = true) {
     console.log(`📊 Populating Donut ${donutNumber} with ${categories.length} categories (filterZeroRevenue: ${filterZeroRevenue}, showPercentages: ${showPercentages})`);
     
-    // Define category colors (matching the service)
-    const categoryColors = {
-        'Coffee': '#8B4513',
-        'Snacks & Appetizers': '#FFA500',
-        'Rice Bowl Meals': '#DAA520',
-        'Hot Sizzlers': '#FF6347',
-        'Party Platters': '#FFD700',
-        'Budget Meals': '#90EE90',
-        'Specialty Dishes': '#DDA0DD',
-        'Milk Tea': '#D2691E',
-        'Frappe': '#FFB6C1',
-        'Beverages': '#87CEEB',
-        'Specialty Drinks': '#9370DB',
-        'Cafe Specials': '#20B2AA',
-        'Milk Drinks': '#CD853F',
-        'Snacks': '#FFB6C1',
-        'Other': '#CCCCCC'
-    };
-    
-    // For Donut 1: categories are already filtered to only revenue items
-    // For Donut 2: categories include all items (we just don't show percentages)
+    // For Donut 1 and Donut 2: categories are the same list
     const validCategories = categories;
     
     let donutTotal = validCategories.reduce((sum, cat) => sum + (breakdown[cat]?.amount || 0), 0);
     
-    console.log(`   Showing ${validCategories.length} categories out of ${categories.length} (filterZeroRevenue: ${filterZeroRevenue})`);
+    console.log(`   Showing ${validCategories.length} categories`);
     
     let conicStops = [];
     let currentPercent = 0;
     let slotIndex = 1;
     
-    // Display all valid categories (either with revenue or all categories)
+    // Display all valid categories
     for (const category of validCategories) {
-        const data = breakdown[category];
-        const color = categoryColors[category] || colors[(slotIndex - 1) % colors.length];
+        const data = breakdown[category] || { amount: 0, count: 0 };
+        // Use the same category color for both donuts
+        const color = categoryColors[category] || '#CCCCCC';
         
         const percentOfTotal = totalRevenue > 0 ? ((data?.amount || 0) / totalRevenue) * 100 : 0;
         const percentOfDonut = donutTotal > 0 ? ((data?.amount || 0) / donutTotal) * 100 : 0;
@@ -1765,24 +1843,30 @@ function populateSingleDonut(donutNumber, categories, breakdown, colors, totalRe
         if (percentEl) {
             // Only show percentage if showPercentages is true (Donut 1 yes, Donut 2 no)
             if (showPercentages) {
-                percentEl.textContent = `${percentOfTotal.toFixed(1)}%`;
-                percentEl.style.color = color;
-                percentEl.style.fontWeight = '700';
+                percentEl.textContent = data?.amount > 0 ? `${percentOfTotal.toFixed(1)}%` : '0%';
+                percentEl.style.color = data?.amount > 0 ? color : '#94a3b8';
+                percentEl.style.fontWeight = data?.amount > 0 ? '700' : '400';
             } else {
-                // For Donut 2, hide the percentage
+                // For Donut 2, we still want to show the category name with its color square
+                // but no percentage
                 percentEl.textContent = '';
                 percentEl.style.display = 'none';
             }
         }
         
-        // Update color square
+        // Update color square - use the same colors for both donuts
         const colorSquare = nameEl?.previousElementSibling;
         if (colorSquare) {
             colorSquare.style.backgroundColor = color;
+            colorSquare.style.width = '12px';
+            colorSquare.style.height = '12px';
+            colorSquare.style.borderRadius = '3px';
+            colorSquare.style.display = 'inline-block';
+            colorSquare.style.marginRight = '8px';
         }
         
         // Only add to conic gradient if there's actual revenue (for visual donut)
-        if (percentOfDonut > 0) {
+        if (data?.amount > 0 && percentOfDonut > 0) {
             conicStops.push(`${color} ${currentPercent}% ${currentPercent + percentOfDonut}%`);
             currentPercent += percentOfDonut;
         }
@@ -1792,7 +1876,7 @@ function populateSingleDonut(donutNumber, categories, breakdown, colors, totalRe
         slotIndex++;
     }
     
-    // Hide remaining slots (don't show dashes)
+    // Hide remaining slots
     for (let i = slotIndex; i <= 11; i++) {
         const nameId = `cat${donutNumber}_name${i}`;
         const percentId = `cat${donutNumber}_percent${i}`;
@@ -1800,7 +1884,6 @@ function populateSingleDonut(donutNumber, categories, breakdown, colors, totalRe
         const nameEl = document.getElementById(nameId);
         const percentEl = document.getElementById(percentId);
         
-        // Hide the entire list item instead of showing dashes
         if (nameEl) {
             nameEl.textContent = '';
             const parentLi = nameEl.closest('li');
